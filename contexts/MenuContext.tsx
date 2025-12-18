@@ -99,15 +99,14 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [tables, setTables] = useState<Table[]>([]);
 
   useEffect(() => {
-    if (user) {
-      initializeMenuData();
-    }
+    // Inicializa dados sempre, independente do login
+    initializeMenuData();
   }, [user]);
 
   const generateQRCode = (tableNumber: string): string => {
-    const restaurantSlug = user?.currentRestaurant.name
+    const restaurantSlug = user?.currentRestaurant?.name
       .toLowerCase()
-      .replace(/\s+/g, '-');
+      .replace(/\s+/g, '-') || 'restaurante';
     const origin =
       typeof window !== 'undefined' ? window.location.origin : '';
     return `${origin}/menu/${restaurantSlug}?table=${tableNumber}`;
@@ -405,7 +404,10 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     return generateQRCode(tableNumber);
   };
 
-  const getPublicMenu = () => {
+  const getPublicMenu = (restaurantSlug?: string) => {
+    // O slug pode ser usado futuramente para buscar cardápio de restaurantes específicos
+    console.log('Loading menu for:', restaurantSlug);
+    
     const now = new Date();
     const currentTime = now.toTimeString().slice(0, 5);
     const currentDay = now
