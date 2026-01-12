@@ -126,7 +126,6 @@ export default function AdminBillingPage() {
       setLoading(false);
     }
   };
-  };
 
   const filteredSubscriptions = subscriptions.filter(sub => {
     const matchesSearch = (sub.restaurantName || '').toLowerCase().includes(searchTerm.toLowerCase());
@@ -395,10 +394,10 @@ export default function AdminBillingPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
-                              {subscription.restaurantName.charAt(0)}
+                              {(subscription.restaurantName ?? '').charAt(0)}
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{subscription.restaurantName}</div>
+                              <div className="text-sm font-medium text-gray-900">{subscription.restaurantName ?? 'N/A'}</div>
                             </div>
                           </div>
                         </td>
@@ -416,7 +415,7 @@ export default function AdminBillingPage() {
                           {formatCurrency(subscription.amount)}/mês
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {format(new Date(subscription.nextBillingDate), "dd/MM/yyyy", { locale: ptBR })}
+                          {subscription.nextBillingDate ? format(new Date(subscription.nextBillingDate), "dd/MM/yyyy", { locale: ptBR }) : 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="relative">
@@ -508,7 +507,7 @@ export default function AdminBillingPage() {
                           <div className="text-sm font-medium text-gray-900">{payment.invoiceNumber}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{payment.restaurantName}</div>
+                          <div className="text-sm text-gray-900">{payment.restaurantName ?? 'N/A'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {formatCurrency(payment.amount)}
@@ -522,9 +521,11 @@ export default function AdminBillingPage() {
                           {payment.method}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {payment.paidAt
+                          {payment.paidAt && !isNaN(new Date(payment.paidAt).getTime())
                             ? format(new Date(payment.paidAt), "dd/MM/yyyy HH:mm", { locale: ptBR })
-                            : format(new Date(payment.createdAt), "dd/MM/yyyy", { locale: ptBR })}
+                            : payment.createdAt && !isNaN(new Date(payment.createdAt).getTime())
+                            ? format(new Date(payment.createdAt), "dd/MM/yyyy", { locale: ptBR })
+                            : 'N/A'}
                         </td>
                       </tr>
                     ))
@@ -545,10 +546,10 @@ export default function AdminBillingPage() {
             <div className="space-y-6">
               <div className="flex items-center space-x-4">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold">
-                  {selectedSubscription.restaurantName.charAt(0)}
+                  {(selectedSubscription.restaurantName ?? '').charAt(0)}
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">{selectedSubscription.restaurantName}</h3>
+                  <h3 className="text-xl font-bold text-gray-900">{selectedSubscription.restaurantName ?? 'N/A'}</h3>
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPlanColor(selectedSubscription.plan)}`}>
                     {selectedSubscription.plan}
                   </span>
@@ -571,11 +572,11 @@ export default function AdminBillingPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between py-2 border-b">
                   <span className="text-gray-600">Início da Assinatura</span>
-                  <span className="font-medium">{format(new Date(selectedSubscription.startDate), "dd/MM/yyyy", { locale: ptBR })}</span>
+                  <span className="font-medium">{selectedSubscription.startDate && !isNaN(new Date(selectedSubscription.startDate).getTime()) ? format(new Date(selectedSubscription.startDate), "dd/MM/yyyy", { locale: ptBR }) : 'N/A'}</span>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b">
                   <span className="text-gray-600">Próxima Cobrança</span>
-                  <span className="font-medium">{format(new Date(selectedSubscription.nextBillingDate), "dd/MM/yyyy", { locale: ptBR })}</span>
+                  <span className="font-medium">{selectedSubscription.nextBillingDate && !isNaN(new Date(selectedSubscription.nextBillingDate).getTime()) ? format(new Date(selectedSubscription.nextBillingDate), "dd/MM/yyyy", { locale: ptBR }) : 'N/A'}</span>
                 </div>
               </div>
 

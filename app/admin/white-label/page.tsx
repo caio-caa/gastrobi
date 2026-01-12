@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Palette, 
   Globe, 
@@ -27,6 +27,7 @@ import { useWhiteLabel } from '@/contexts/WhiteLabelContext';
 import Layout from '@/components/Layout/Layout';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
+import { whiteLabelApi } from '@/lib/api';
 
 interface WhiteLabelClient {
   id: string;
@@ -52,69 +53,10 @@ export default function WhiteLabelAdminPage() {
   const [showClientModal, setShowClientModal] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [copiedUrl, setCopiedUrl] = useState('');
+  const [clients, setClients] = useState<WhiteLabelClient[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState(config);
-  const [clients] = useState<WhiteLabelClient[]>([
-    {
-      id: '1',
-      name: 'RestauranteSystem',
-      domain: 'restaurantesystem.com',
-      customDomain: 'sistema.restaurantesystem.com',
-      status: 'active',
-      plan: 'enterprise',
-      createdAt: new Date('2024-01-15'),
-      lastAccess: new Date(),
-      config: {
-        brandName: 'RestauranteSystem',
-        primaryColor: '#dc2626',
-        secondaryColor: '#991b1b'
-      },
-      metrics: {
-        users: 45,
-        restaurants: 12,
-        revenue: 8940
-      }
-    },
-    {
-      id: '2',
-      name: 'FoodTech Pro',
-      domain: 'foodtech.pro',
-      status: 'active',
-      plan: 'premium',
-      createdAt: new Date('2024-02-20'),
-      lastAccess: new Date(Date.now() - 86400000),
-      config: {
-        brandName: 'FoodTech Pro',
-        primaryColor: '#059669',
-        secondaryColor: '#047857'
-      },
-      metrics: {
-        users: 23,
-        restaurants: 8,
-        revenue: 2910
-      }
-    },
-    {
-      id: '3',
-      name: 'GestãoFood',
-      domain: 'gestaofood.com.br',
-      status: 'pending',
-      plan: 'basic',
-      createdAt: new Date('2024-03-10'),
-      lastAccess: new Date(Date.now() - 172800000),
-      config: {
-        brandName: 'GestãoFood',
-        primaryColor: '#7c3aed',
-        secondaryColor: '#5b21b6'
-      },
-      metrics: {
-        users: 5,
-        restaurants: 2,
-        revenue: 470
-      }
-    }
-  ]);
-
   const [newClient, setNewClient] = useState({
     name: '',
     domain: '',
@@ -126,6 +68,24 @@ export default function WhiteLabelAdminPage() {
     supportEmail: '',
     supportPhone: ''
   });
+
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  const loadClients = async () => {
+    setLoading(true);
+    try {
+      const response = await whiteLabelApi.list();
+      if (response.data && Array.isArray(response.data.data)) {
+        setClients(response.data.data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar clientes white label:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const tabs = [
     { id: 'clients', name: 'Clientes White Label', icon: Users },
@@ -293,27 +253,39 @@ export default function WhiteLabelAdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {clients.map(client => (
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                      Carregando...
+                    </td>
+                  </tr>
+                ) : clients.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                      Nenhum cliente white label encontrado
+                    </td>
+                  </tr>
+                ) : clients.map(client => (
                   <tr key={client.id}>
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-3">
                         <div 
                           className="w-10 h-10 rounded-lg flex items-center justify-center"
-                          style={{ backgroundColor: client.config.primaryColor }}
+                          style={{ backgroundColor: client.config?.primaryColor ?? '#3b82f6' }}
                         >
                           <span className="text-white font-bold">
-                            {client.name.charAt(0)}
+                            {(client.name ?? '').charAt(0)}
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">{client.name}</p>
-                          <p className="text-sm text-gray-500">{client.config.brandName}</p>
+                          <p className="font-medium text-gray-900">{client.name ?? 'N/A'}</p>
+                          <p className="text-sm text-gray-500">{client.config?.brandName ?? 'N/A'}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div>
-                        <p className="text-sm text-gray-900">{client.domain}</p>
+                        <p className="text-sm text-gray-900">{client.domain ?? 'N/A'}</p>
                         {client.customDomain && (
                           <p className="text-xs text-gray-500">{client.customDomain}</p>
                         )}
@@ -321,7 +293,7 @@ export default function WhiteLabelAdminPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPlanColor(client.plan)}`}>
-                        {client.plan.charAt(0).toUpperCase() + client.plan.slice(1)}
+                        {(client.plan ?? '').charAt(0).toUpperCase() + (client.plan ?? '').slice(1)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -331,8 +303,8 @@ export default function WhiteLabelAdminPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm">
-                        <p className="text-gray-900">{client.metrics.users} usuários</p>
-                        <p className="text-gray-500">{client.metrics.restaurants} restaurantes</p>
+                        <p className="text-gray-900">{(client.metrics?.users ?? 0)} usuários</p>
+                        <p className="text-gray-500">{(client.metrics?.restaurants ?? 0)} restaurantes</p>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -382,11 +354,15 @@ export default function WhiteLabelAdminPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="font-semibold text-gray-900 mb-4">Configuração de Domínios</h3>
             <div className="space-y-4">
-              {clients.map(client => (
+              {loading ? (
+                <div className="text-center text-gray-500 py-8">Carregando...</div>
+              ) : clients.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">Nenhum cliente encontrado</div>
+              ) : clients.map(client => (
                 <div key={client.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
-                    <p className="font-medium text-gray-900">{client.name}</p>
-                    <p className="text-sm text-gray-500">{client.domain}</p>
+                    <p className="font-medium text-gray-900">{client.name ?? 'N/A'}</p>
+                    <p className="text-sm text-gray-500">{client.domain ?? 'N/A'}</p>
                   </div>
                   <div className="flex items-center space-x-4">
                     <span className={`px-2 py-1 text-xs rounded-full ${
