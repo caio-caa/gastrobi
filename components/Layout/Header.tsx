@@ -3,16 +3,12 @@
 import React, { useState } from 'react';
 import {
   Menu,
-  Bell,
   ChevronDown,
   LogOut,
-  AlertTriangle,
-  Info,
   CheckCircle,
   Shield,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useData } from '@/contexts/DataContext';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -20,47 +16,7 @@ interface HeaderProps {
 
 function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth();
-  const { alerts, markAlertAsRead } = useData();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-
-  const unreadAlerts = alerts.filter((a) => !a.isRead);
-
-  const getAlertIcon = (type: string) => {
-    switch (type) {
-      case 'warning':
-        return AlertTriangle;
-      case 'info':
-        return Info;
-      case 'success':
-        return CheckCircle;
-      default:
-        return Info;
-    }
-  };
-
-  const getAlertColor = (type: string) => {
-    switch (type) {
-      case 'warning':
-        return 'text-yellow-600 bg-yellow-50';
-      case 'error':
-        return 'text-red-600 bg-red-50';
-      case 'success':
-        return 'text-green-600 bg-green-50';
-      default:
-        return 'text-blue-600 bg-blue-50';
-    }
-  };
-
-  const handleAlertClick = (alert: {
-    id: string;
-    actionUrl?: string;
-  }) => {
-    markAlertAsRead(alert.id);
-    if (alert.actionUrl && typeof window !== 'undefined') {
-      window.location.href = alert.actionUrl;
-    }
-  };
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-100 relative z-40">
@@ -89,87 +45,6 @@ function Header({ onMenuClick }: HeaderProps) {
 
         {/* Right Section */}
         <div className="flex items-center space-x-2 lg:space-x-4">
-          {/* Notificações */}
-          <div className="relative">
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2 rounded-lg hover:bg-gray-100 relative"
-            >
-              <Bell className="w-5 h-5 text-gray-500" />
-              {unreadAlerts.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs text-white font-medium">
-                    {unreadAlerts.length > 9 ? '9+' : unreadAlerts.length}
-                  </span>
-                </span>
-              )}
-            </button>
-
-            {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-100 z-50 max-h-96 overflow-y-auto">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <h3 className="text-sm font-medium text-gray-900">
-                    Notificações
-                  </h3>
-                </div>
-
-                {alerts.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    <Bell className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                    <p className="text-sm">Nenhuma notificação</p>
-                  </div>
-                ) : (
-                  <div className="py-2">
-                    {alerts.slice(0, 10).map((alert) => {
-                      const IconComponent = getAlertIcon(alert.type);
-                      return (
-                        <div
-                          key={alert.id}
-                          onClick={() => handleAlertClick(alert)}
-                          className={`px-4 py-3 hover:bg-gray-50 cursor-pointer border-l-4 ${
-                            alert.isRead ? 'opacity-60' : ''
-                          } ${
-                            alert.type === 'warning'
-                              ? 'border-yellow-400'
-                              : alert.type === 'error'
-                              ? 'border-red-400'
-                              : alert.type === 'success'
-                              ? 'border-green-400'
-                              : 'border-blue-400'
-                          }`}
-                        >
-                          <div className="flex items-start space-x-3">
-                            <div
-                              className={`p-1 rounded-full ${getAlertColor(
-                                alert.type
-                              )}`}
-                            >
-                              <IconComponent className="w-4 h-4" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900">
-                                {alert.title}
-                              </p>
-                              <p className="text-sm text-gray-600 mt-1">
-                                {alert.message}
-                              </p>
-                              <p className="text-xs text-gray-400 mt-1">
-                                {alert.createdAt.toLocaleString()}
-                              </p>
-                            </div>
-                            {!alert.isRead && (
-                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
           {/* Menu do Usuário */}
           <div className="relative">
             <button
