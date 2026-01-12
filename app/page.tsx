@@ -1,53 +1,34 @@
 'use client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import {
-  ChefHat,
-  Users,
-  BarChart3,
-  QrCode,
-  Star,
-  Check,
-  ArrowRight,
-  Play,
-  Menu,
-  X,
-  Gift,
-  Megaphone,
-  Calculator,
-  Zap,
-  Heart,
-  TrendingUp,
-  Clock,
-  Target,
-  Headphones,
-} from 'lucide-react';
-import { useWhiteLabel } from '@/contexts/WhiteLabelContext';
-import WhiteLabelHeader from '@/components/WhiteLabel/WhiteLabelHeader';
-import WhiteLabelFooter from '@/components/WhiteLabel/WhiteLabelFooter';
-import WhiteLabelButton from '@/components/WhiteLabel/WhiteLabelButton';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
-export default function LandingPage() {
-  const { config } = useWhiteLabel();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+export default function RootPage() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
 
-  const features = [
-    {
-      icon: QrCode,
-      title: 'Cardápio Digital',
-      description: 'QR codes para mesas, cardápio responsivo e pedidos diretos pelo celular',
-    },
-    {
-      icon: Calculator,
-      title: 'Sistema POS Completo',
-      description: 'Frente de caixa, delivery, comandas eletrônicas e controle de mesas',
-    },
-    {
-      icon: Gift,
-      title: 'Programa de Fidelidade',
-      description: 'Sistema de pontos, níveis de clientes e recompensas automáticas',
-    },
+  useEffect(() => {
+    if (!isLoading) {
+      if (user?.currentRestaurant?.id) {
+        // Usuário autenticado, redirecionar para dashboard
+        router.push(`/dashboard/${user.currentRestaurant.id}`);
+      } else {
+        // Usuário não autenticado, redirecionar para login
+        router.push('/login');
+      }
+    }
+  }, [user, isLoading, router]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-gray-600">Carregando...</p>
+      </div>
+    </div>
+  );
+}
     {
       icon: Megaphone,
       title: 'Marketing Inteligente',
