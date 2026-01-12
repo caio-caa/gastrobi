@@ -170,27 +170,28 @@ export default function AdminAuditPage() {
   };
 
   const formatLogDescription = (log: AuditLog) => {
+    const details = log.details || {};
     switch (log.action) {
       case 'LOGIN':
         return `fez login no sistema`;
       case 'LOGOUT':
         return `saiu do sistema`;
       case 'CREATE':
-        return `criou ${log.entity} "${log.details.name || log.details.email || log.entityId}"`;
+        return `criou ${log.entity} "${details.name || details.email || log.entityId}"`;
       case 'UPDATE':
-        if (log.details.field) {
-          return `atualizou ${log.details.field} em ${log.entity}`;
+        if (details.field) {
+          return `atualizou ${details.field} em ${log.entity}`;
         }
-        if (log.details.plan) {
-          return `alterou plano de ${log.details.plan.from} para ${log.details.plan.to}`;
+        if (details.plan) {
+          return `alterou plano de ${details.plan.from} para ${details.plan.to}`;
         }
         return `atualizou ${log.entity}`;
       case 'DELETE':
-        return `excluiu ${log.entity} "${log.details.clientName || log.entityId}"`;
+        return `excluiu ${log.entity} "${details.clientName || log.entityId}"`;
       case 'VIEW':
-        return `visualizou ${log.details.page || log.entity}`;
+        return `visualizou ${details.page || log.entity}`;
       case 'EXPORT':
-        return `exportou ${log.details.records} registros de ${log.entity}`;
+        return `exportou ${details.records} registros de ${log.entity}`;
       default:
         return `realizou ação em ${log.entity}`;
     }
