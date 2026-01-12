@@ -15,6 +15,10 @@ import {
   QrCode,
   Calculator,
   Palette,
+  Building2,
+  CreditCard,
+  FileText,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWhiteLabel } from '@/contexts/WhiteLabelContext';
@@ -25,11 +29,14 @@ interface SidebarProps {
   setOpen: (open: boolean) => void;
 }
 
-// Admin SaaS Navigation Only
+// Admin SaaS Navigation
 const adminSaaSNavigation = [
   { name: 'Gestão de Usuários', href: '/admin/users', icon: Users },
-  { name: 'White Label & Clientes', href: '/admin/white-label', icon: Palette },
-  { name: 'Analytics & Métricas', href: '/admin/analytics', icon: BarChart3 },
+  { name: 'Restaurantes', href: '/admin/restaurants', icon: Building2 },
+  { name: 'White Label', href: '/admin/white-label', icon: Palette },
+  { name: 'Faturamento', href: '/admin/billing', icon: CreditCard },
+  { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+  { name: 'Logs de Auditoria', href: '/admin/audit', icon: FileText },
 ];
 
 function Sidebar({ open, setOpen }: SidebarProps) {
