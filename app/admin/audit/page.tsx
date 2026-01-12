@@ -29,6 +29,7 @@ import Button from '@/components/ui/Button';
 import Layout from '@/components/Layout/Layout';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { auditApi } from '@/lib/api';
 
 interface AuditLog {
   id: string;
@@ -74,165 +75,24 @@ export default function AdminAuditPage() {
 
   const loadData = async () => {
     setLoading(true);
+    try {
+      const [logsResponse, statsResponse] = await Promise.all([
+        auditApi.list({ take: 100 }),
+        auditApi.stats()
+      ]);
 
-    // Mock data - será substituído pela API real
-    const mockLogs: AuditLog[] = [
-      {
-        id: '1',
-        userId: 'u1',
-        userEmail: 'admin@gastrobi.com',
-        userName: 'Admin Principal',
-        action: 'LOGIN',
-        entity: 'User',
-        entityId: 'u1',
-        details: { method: 'password', success: true },
-        ipAddress: '189.45.123.78',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
-        createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString()
-      },
-      {
-        id: '2',
-        userId: 'u1',
-        userEmail: 'admin@gastrobi.com',
-        userName: 'Admin Principal',
-        action: 'CREATE',
-        entity: 'Restaurant',
-        entityId: 'r10',
-        details: { name: 'Sushi Express', plan: 'BASIC' },
-        ipAddress: '189.45.123.78',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
-        createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
-      },
-      {
-        id: '3',
-        userId: 'u2',
-        userEmail: 'suporte@gastrobi.com',
-        userName: 'Suporte Técnico',
-        action: 'UPDATE',
-        entity: 'User',
-        entityId: 'u5',
-        details: { field: 'isActive', oldValue: true, newValue: false },
-        ipAddress: '200.18.45.67',
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15',
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: '4',
-        userId: 'u1',
-        userEmail: 'admin@gastrobi.com',
-        userName: 'Admin Principal',
-        action: 'UPDATE',
-        entity: 'Subscription',
-        entityId: 's3',
-        details: { plan: { from: 'BASIC', to: 'PREMIUM' }, restaurantName: 'Pizzaria Bella' },
-        ipAddress: '189.45.123.78',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
-        createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: '5',
-        userId: 'u3',
-        userEmail: 'financeiro@gastrobi.com',
-        userName: 'Financeiro',
-        action: 'EXPORT',
-        entity: 'Payment',
-        entityId: null,
-        details: { format: 'CSV', period: '2026-01', records: 45 },
-        ipAddress: '177.89.234.12',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/121.0',
-        createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: '6',
-        userId: 'u2',
-        userEmail: 'suporte@gastrobi.com',
-        userName: 'Suporte Técnico',
-        action: 'DELETE',
-        entity: 'WhiteLabel',
-        entityId: 'wl2',
-        details: { clientName: 'Cliente Inativo', reason: 'Solicitação do cliente' },
-        ipAddress: '200.18.45.67',
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15',
-        createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: '7',
-        userId: 'u1',
-        userEmail: 'admin@gastrobi.com',
-        userName: 'Admin Principal',
-        action: 'VIEW',
-        entity: 'Analytics',
-        entityId: null,
-        details: { page: 'revenue', dateRange: '30d' },
-        ipAddress: '189.45.123.78',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
-        createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: '8',
-        userId: 'u4',
-        userEmail: 'novo.admin@gastrobi.com',
-        userName: 'Novo Admin',
-        action: 'LOGIN',
-        entity: 'User',
-        entityId: 'u4',
-        details: { method: 'password', success: true, firstLogin: true },
-        ipAddress: '192.168.1.100',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2) Mobile/15E148',
-        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: '9',
-        userId: 'u1',
-        userEmail: 'admin@gastrobi.com',
-        userName: 'Admin Principal',
-        action: 'CREATE',
-        entity: 'User',
-        entityId: 'u4',
-        details: { email: 'novo.admin@gastrobi.com', role: 'ADMIN' },
-        ipAddress: '189.45.123.78',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
-        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: '10',
-        userId: 'u1',
-        userEmail: 'admin@gastrobi.com',
-        userName: 'Admin Principal',
-        action: 'LOGOUT',
-        entity: 'User',
-        entityId: 'u1',
-        details: { sessionDuration: '2h 45m' },
-        ipAddress: '189.45.123.78',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
-        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+      if (logsResponse.data && Array.isArray(logsResponse.data.data)) {
+        setLogs(logsResponse.data.data);
       }
-    ];
 
-    setLogs(mockLogs);
-    setStats({
-      totalLogs: 1250,
-      logsByAction: {
-        CREATE: 320,
-        UPDATE: 580,
-        DELETE: 45,
-        LOGIN: 245,
-        LOGOUT: 40,
-        VIEW: 15,
-        EXPORT: 5
-      },
-      logsByEntity: {
-        User: 420,
-        Restaurant: 380,
-        Subscription: 180,
-        Payment: 150,
-        WhiteLabel: 85,
-        Analytics: 35
-      },
-      logsLast24h: 42,
-      logsLast7d: 285
-    });
-    setLoading(false);
+      if (statsResponse.data) {
+        setStats(statsResponse.data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar logs de auditoria:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredLogs = logs.filter(log => {

@@ -31,6 +31,7 @@ import Modal from '@/components/ui/Modal';
 import Layout from '@/components/Layout/Layout';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { restaurantsApi, analyticsApi } from '@/lib/api';
 
 interface Restaurant {
   id: string;
@@ -99,124 +100,25 @@ export default function AdminRestaurantsPage() {
 
   const loadData = async () => {
     setLoading(true);
-    
-    // Mock data - será substituído pela API real
-    const mockRestaurants: Restaurant[] = [
-      {
-        id: '1',
-        name: 'Hamburgueria do Zé',
-        slug: 'hamburgueria-do-ze',
-        cnpj: '12.345.678/0001-90',
-        phone: '+5511999999999',
-        email: 'contato@hamburgueriadoze.com',
-        status: 'ACTIVE',
-        createdAt: '2024-06-15T00:00:00.000Z',
-        subscription: {
-          plan: 'PREMIUM',
-          status: 'ACTIVE',
-          nextBillingDate: '2026-02-15T00:00:00.000Z',
-          amount: 299
-        },
-        _count: {
-          orders: 1250,
-          customers: 890,
-          products: 45
-        },
-        owner: {
-          id: 'u1',
-          fullName: 'José Silva',
-          email: 'jose@hamburgueriadoze.com'
-        }
-      },
-      {
-        id: '2',
-        name: 'Pizzaria Bella Napoli',
-        slug: 'pizzaria-bella-napoli',
-        cnpj: '98.765.432/0001-10',
-        phone: '+5511988888888',
-        email: 'contato@bellanapoli.com',
-        status: 'ACTIVE',
-        createdAt: '2024-08-20T00:00:00.000Z',
-        subscription: {
-          plan: 'ENTERPRISE',
-          status: 'ACTIVE',
-          nextBillingDate: '2026-02-20T00:00:00.000Z',
-          amount: 599
-        },
-        _count: {
-          orders: 2340,
-          customers: 1560,
-          products: 78
-        },
-        owner: {
-          id: 'u2',
-          fullName: 'Maria Santos',
-          email: 'maria@bellanapoli.com'
-        }
-      },
-      {
-        id: '3',
-        name: 'Sushi Express',
-        slug: 'sushi-express',
-        cnpj: null,
-        phone: '+5511977777777',
-        email: 'contato@sushiexpress.com',
-        status: 'TRIAL',
-        createdAt: '2026-01-05T00:00:00.000Z',
-        subscription: {
-          plan: 'BASIC',
-          status: 'TRIAL',
-          nextBillingDate: '2026-02-05T00:00:00.000Z',
-          amount: 0
-        },
-        _count: {
-          orders: 45,
-          customers: 32,
-          products: 25
-        },
-        owner: {
-          id: 'u3',
-          fullName: 'Carlos Tanaka',
-          email: 'carlos@sushiexpress.com'
-        }
-      },
-      {
-        id: '4',
-        name: 'Cantina Italiana',
-        slug: 'cantina-italiana',
-        cnpj: '11.222.333/0001-44',
-        phone: '+5511966666666',
-        email: 'contato@cantinaitaliana.com',
-        status: 'SUSPENDED',
-        createdAt: '2024-03-10T00:00:00.000Z',
-        subscription: {
-          plan: 'PREMIUM',
-          status: 'PAST_DUE',
-          nextBillingDate: '2026-01-10T00:00:00.000Z',
-          amount: 299
-        },
-        _count: {
-          orders: 890,
-          customers: 456,
-          products: 52
-        },
-        owner: {
-          id: 'u4',
-          fullName: 'Giovanni Rossi',
-          email: 'giovanni@cantinaitaliana.com'
-        }
+    try {
+      const response = await restaurantsApi.list({ take: 50 });
+      if (response.data && Array.isArray(response.data.data)) {
+        setRestaurants(response.data.data);
+        
+        // Calcular métricas
+        setMetrics({
+          totalRestaurants: response.data.total || 0,
+          activeRestaurants: response.data.data.filter((r: Restaurant) => r.status === 'ACTIVE').length,
+          trialRestaurants: response.data.data.filter((r: Restaurant) => r.status === 'TRIAL').length,
+          suspendedRestaurants: response.data.data.filter((r: Restaurant) => r.status === 'SUSPENDED').length,
+          monthlyRevenue: response.data.data.reduce((acc: number, r: Restaurant) => acc + (r.subscription?.amount || 0), 0)
+        });
       }
-    ];
-
-    setRestaurants(mockRestaurants);
-    setMetrics({
-      totalRestaurants: mockRestaurants.length,
-      activeRestaurants: mockRestaurants.filter(r => r.status === 'ACTIVE').length,
-      trialRestaurants: mockRestaurants.filter(r => r.status === 'TRIAL').length,
-      suspendedRestaurants: mockRestaurants.filter(r => r.status === 'SUSPENDED').length,
-      monthlyRevenue: mockRestaurants.reduce((acc, r) => acc + (r.subscription?.amount || 0), 0)
-    });
-    setLoading(false);
+    } catch (error) {
+      console.error('Erro ao carregar restaurantes:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredRestaurants = restaurants.filter(restaurant => {

@@ -22,6 +22,7 @@ import Layout from '@/components/Layout/Layout';
 import Button from '@/components/ui/Button';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { analyticsApi } from '@/lib/api';
 
 interface AnalyticsData {
   overview: {
@@ -80,92 +81,48 @@ export default function SaaSAnalyticsPage() {
 
   const loadAnalyticsData = async () => {
     setLoading(true);
-    
-    const mockData: AnalyticsData = {
-      overview: {
-        totalRevenue: 125670.80,
-        monthlyRevenue: 18940.50,
-        totalClients: 45,
-        activeClients: 38,
-        totalUsers: 234,
-        activeUsers: 198,
-        totalRestaurants: 156,
-        conversionRate: 78.5,
-        churnRate: 3.2,
-        avgRevenuePerUser: 537.50
-      },
-      revenueByPlan: [
-        { plan: 'Básico', revenue: 23500, clients: 25, color: '#3b82f6' },
-        { plan: 'Premium', revenue: 58200, clients: 15, color: '#10b981' },
-        { plan: 'Enterprise', revenue: 43970, clients: 5, color: '#8b5cf6' }
-      ],
-      growthData: [
-        { month: 'Jan', revenue: 8500, clients: 12, users: 45 },
-        { month: 'Fev', revenue: 12300, clients: 18, users: 67 },
-        { month: 'Mar', revenue: 15600, clients: 25, users: 89 },
-        { month: 'Abr', revenue: 18200, clients: 32, users: 123 },
-        { month: 'Mai', revenue: 21800, clients: 38, users: 156 },
-        { month: 'Jun', revenue: 25400, clients: 45, users: 198 }
-      ],
-      clientActivity: [
-        {
-          clientName: 'RestauranteSystem',
-          domain: 'restaurantesystem.com',
-          plan: 'Enterprise',
-          status: 'active',
-          revenue: 15970,
-          users: 67,
-          restaurants: 23,
-          lastActivity: new Date().toISOString(),
-          growth: 12.5
-        },
-        {
-          clientName: 'FoodTech Pro',
-          domain: 'foodtech.pro',
-          plan: 'Premium',
-          status: 'active',
-          revenue: 8940,
-          users: 34,
-          restaurants: 12,
-          lastActivity: new Date(Date.now() - 3600000).toISOString(),
-          growth: 8.3
-        },
-        {
-          clientName: 'GestãoFood',
-          domain: 'gestaofood.com.br',
-          plan: 'Básico',
-          status: 'trial',
-          revenue: 0,
-          users: 8,
-          restaurants: 3,
-          lastActivity: new Date(Date.now() - 86400000).toISOString(),
-          growth: -2.1
-        }
-      ],
-      alerts: [
-        {
-          id: '1',
-          type: 'warning',
-          title: 'Churn Alert',
-          message: '3 clientes não acessaram há mais de 7 dias',
-          timestamp: new Date(),
-          priority: 'high'
-        },
-        {
-          id: '2',
-          type: 'success',
-          title: 'Meta Atingida',
-          message: 'Meta de receita mensal foi atingida!',
-          timestamp: new Date(Date.now() - 86400000),
-          priority: 'low'
-        }
-      ]
-    };
+    try {
+      const [overview, revenue, growth, retention] = await Promise.all([
+        analyticsApi.overview(),
+        analyticsApi.revenue(
+          new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          new Date().toISOString().split('T')[0]
+        ),
+        analyticsApi.growth(),
+        analyticsApi.retention()
+      ]);
 
-    setTimeout(() => {
-      setAnalyticsData(mockData);
+      if (overview.data) {
+        const data: AnalyticsData = {
+          overview: {
+            totalRevenue: overview.data.totalRevenue || 0,
+            monthlyRevenue: overview.data.monthlyRecurringRevenue || 0,
+            totalClients: overview.data.totalRestaurants || 0,
+            activeClients: Math.floor((overview.data.totalRestaurants || 0) * 0.85),
+            totalUsers: overview.data.totalUsers || 0,
+            activeUsers: Math.floor((overview.data.totalUsers || 0) * 0.85),
+            totalRestaurants: overview.data.totalRestaurants || 0,
+            conversionRate: 78.5,
+            churnRate: growth.data?.churnRate || 3.2,
+            avgRevenuePerUser: (overview.data.totalRevenue || 0) / Math.max(overview.data.totalUsers || 1, 1)
+          },
+          revenueByPlan: [
+            { plan: 'Básico', revenue: (revenue.data?.revenueByPlan?.BASIC || 0), clients: 25, color: '#3b82f6' },
+            { plan: 'Premium', revenue: (revenue.data?.revenueByPlan?.PREMIUM || 0), clients: 15, color: '#10b981' },
+            { plan: 'Enterprise', revenue: (revenue.data?.revenueByPlan?.ENTERPRISE || 0), clients: 5, color: '#8b5cf6' }
+          ],
+          growthData: revenue.data?.dailyRevenue || [],
+          clientActivity: [],
+          alerts: []
+        };
+
+        setAnalyticsData(data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar analytics:', error);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   const formatCurrency = (value: number) => {

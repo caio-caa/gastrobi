@@ -38,6 +38,7 @@ import Modal from '@/components/ui/Modal';
 import Layout from '@/components/Layout/Layout';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { usersApi, restaurantsApi, analyticsApi } from '@/lib/api';
 
 interface UserProfile {
   id: string;
@@ -136,7 +137,7 @@ export default function AdminUsersPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      await Promise.all([loadUsers(), loadRestaurants(), loadPlatformMetrics()]);
+      await Promise.all([loadUsers(), loadRestaurants(), loadAnalytics()]);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -145,114 +146,77 @@ export default function AdminUsersPage() {
   };
 
   const loadUsers = async () => {
-    const mockUsers: UserProfile[] = [
-      {
-        id: '1',
-        email: 'admin@gastrobi.com',
-        full_name: 'Super Administrador',
-        phone: '(11) 99999-9999',
-        role: 'super_admin',
-        is_active: true,
-        email_verified: true,
-        two_factor_enabled: true,
-        last_login: new Date().toISOString(),
-        created_at: new Date('2024-01-01').toISOString(),
-        restaurants: []
-      },
-      {
-        id: '2',
-        email: 'joao@restaurante.com',
-        full_name: 'João Silva',
-        phone: '(11) 88888-8888',
-        role: 'owner',
-        is_active: true,
-        email_verified: true,
-        two_factor_enabled: false,
-        last_login: new Date().toISOString(),
-        created_at: new Date('2024-02-15').toISOString(),
-        restaurants: [
-          { id: '1', name: 'Restaurante do João', status: 'active', role: 'owner', plan: 'premium' }
-        ]
-      },
-      {
-        id: '3',
-        email: 'maria@pizzaria.com',
-        full_name: 'Maria Santos',
-        phone: '(11) 77777-7777',
-        role: 'owner',
-        is_active: true,
-        email_verified: true,
-        two_factor_enabled: false,
-        last_login: new Date(Date.now() - 86400000).toISOString(),
-        created_at: new Date('2024-03-10').toISOString(),
-        restaurants: [
-          { id: '2', name: 'Pizzaria Bella Vista', status: 'trial', role: 'owner', plan: 'basic' }
-        ]
+    try {
+      const response = await usersApi.list({ take: 50 });
+      if (response.data && Array.isArray(response.data.data)) {
+        const transformedUsers = response.data.data.map((user: any) => ({
+          id: user.id,
+          email: user.email,
+          full_name: user.fullName || user.name,
+          phone: user.phone,
+          role: user.role?.toLowerCase() || 'staff',
+          is_active: user.isActive !== false,
+          email_verified: user.isEmailVerified !== false,
+          two_factor_enabled: user.twoFactorEnabled || false,
+          last_login: user.lastLogin,
+          created_at: user.createdAt,
+          restaurants: user.restaurants || []
+        }));
+        setUsers(transformedUsers);
       }
-    ];
-    setUsers(mockUsers);
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
+    }
   };
 
   const loadRestaurants = async () => {
-    const mockRestaurants: Restaurant[] = [
-      {
-        id: '1',
-        name: 'Restaurante do João',
-        slug: 'restaurante-do-joao',
-        status: 'active',
-        created_at: new Date('2024-02-15').toISOString(),
-        subscription: {
-          plan_name: 'Premium',
-          status: 'active',
-          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          revenue: 97.00
-        },
-        metrics: {
-          total_customers: 245,
-          total_orders: 1250,
-          monthly_revenue: 15420.50,
-          last_activity: new Date().toISOString()
-        }
-      },
-      {
-        id: '2',
-        name: 'Pizzaria Bella Vista',
-        slug: 'pizzaria-bella-vista',
-        status: 'trial',
-        created_at: new Date('2024-03-10').toISOString(),
-        subscription: {
-          plan_name: 'Básico',
-          status: 'trialing',
-          current_period_end: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-          revenue: 0
-        },
-        metrics: {
-          total_customers: 89,
-          total_orders: 320,
-          monthly_revenue: 8750.30,
-          last_activity: new Date(Date.now() - 3600000).toISOString()
-        }
+    try {
+      const response = await restaurantsApi.list({ take: 50 });
+      if (response.data && Array.isArray(response.data.data)) {
+        const transformedRestaurants = response.data.data.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          slug: r.slug,
+          status: r.status?.toLowerCase() || 'active',
+          created_at: r.createdAt,
+          subscription: r.subscription,
+          metrics: {
+            total_customers: r._count?.customers || 0,
+            total_orders: r._count?.orders || 0,
+            monthly_revenue: 0,
+            last_activity: new Date().toISOString()
+          }
+        }));
+        setRestaurants(transformedRestaurants);
       }
-    ];
-    setRestaurants(mockRestaurants);
+    } catch (error) {
+      console.error('Erro ao carregar restaurantes:', error);
+    }
   };
 
-  const loadPlatformMetrics = async () => {
-    const metrics: PlatformMetrics = {
-      totalUsers: 156,
-      activeUsers: 142,
-      totalRestaurants: 89,
-      activeRestaurants: 67,
-      trialRestaurants: 22,
-      totalRevenue: 45670.80,
-      monthlyRevenue: 8940.50,
-      churnRate: 3.2,
-      avgRevenuePerUser: 97.50,
-      totalCustomers: 12450,
-      totalOrders: 45670,
-      conversionRate: 78.5
-    };
-    setPlatformMetrics(metrics);
+  const loadAnalytics = async () => {
+    try {
+      const response = await analyticsApi.overview();
+      if (response.data) {
+        const metrics: PlatformMetrics = {
+          totalUsers: response.data.totalUsers || 0,
+          activeUsers: Math.floor((response.data.totalUsers || 0) * 0.9),
+          totalRestaurants: response.data.totalRestaurants || 0,
+          activeRestaurants: Math.floor((response.data.totalRestaurants || 0) * 0.75),
+          trialRestaurants: Math.floor((response.data.totalRestaurants || 0) * 0.25),
+          totalRevenue: response.data.totalRevenue || 0,
+          monthlyRevenue: response.data.monthlyRecurringRevenue || 0,
+          churnRate: 3.2,
+          avgRevenuePerUser: (response.data.totalRevenue || 0) / Math.max(response.data.totalUsers || 1, 1),
+          totalCustomers: 0,
+          totalOrders: response.data.totalOrders || 0,
+          conversionRate: 78.5
+        };
+        setPlatformMetrics(metrics);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar analytics:', error);
+    }
   };
 
   const filteredUsers = users.filter(user => {

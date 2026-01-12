@@ -27,6 +27,7 @@ import Modal from '@/components/ui/Modal';
 import Layout from '@/components/Layout/Layout';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { billingApi } from '@/lib/api';
 
 interface Subscription {
   id: string;
@@ -88,136 +89,43 @@ export default function AdminBillingPage() {
 
   const loadData = async () => {
     setLoading(true);
+    try {
+      const [subsResponse, paymentsResponse] = await Promise.all([
+        billingApi.listSubscriptions({ take: 50 }),
+        billingApi.listPayments({ take: 50 })
+      ]);
 
-    // Mock data - será substituído pela API real
-    const mockSubscriptions: Subscription[] = [
-      {
-        id: '1',
-        restaurantId: 'r1',
-        restaurantName: 'Hamburgueria do Zé',
-        plan: 'PREMIUM',
-        status: 'ACTIVE',
-        startDate: '2024-06-15T00:00:00.000Z',
-        nextBillingDate: '2026-02-15T00:00:00.000Z',
-        amount: 299
-      },
-      {
-        id: '2',
-        restaurantId: 'r2',
-        restaurantName: 'Pizzaria Bella Napoli',
-        plan: 'ENTERPRISE',
-        status: 'ACTIVE',
-        startDate: '2024-08-20T00:00:00.000Z',
-        nextBillingDate: '2026-02-20T00:00:00.000Z',
-        amount: 599
-      },
-      {
-        id: '3',
-        restaurantId: 'r3',
-        restaurantName: 'Sushi Express',
-        plan: 'BASIC',
-        status: 'TRIAL',
-        startDate: '2026-01-05T00:00:00.000Z',
-        nextBillingDate: '2026-02-05T00:00:00.000Z',
-        amount: 0
-      },
-      {
-        id: '4',
-        restaurantId: 'r4',
-        restaurantName: 'Cantina Italiana',
-        plan: 'PREMIUM',
-        status: 'PAST_DUE',
-        startDate: '2024-03-10T00:00:00.000Z',
-        nextBillingDate: '2026-01-10T00:00:00.000Z',
-        amount: 299
-      },
-      {
-        id: '5',
-        restaurantId: 'r5',
-        restaurantName: 'Café Central',
-        plan: 'BASIC',
-        status: 'ACTIVE',
-        startDate: '2025-09-01T00:00:00.000Z',
-        nextBillingDate: '2026-02-01T00:00:00.000Z',
-        amount: 99
+      if (subsResponse.data && Array.isArray(subsResponse.data.data)) {
+        setSubscriptions(subsResponse.data.data);
       }
-    ];
 
-    const mockPayments: Payment[] = [
-      {
-        id: 'p1',
-        restaurantId: 'r1',
-        restaurantName: 'Hamburgueria do Zé',
-        amount: 299,
-        status: 'PAID',
-        paidAt: '2026-01-15T10:30:00.000Z',
-        createdAt: '2026-01-15T00:00:00.000Z',
-        method: 'Cartão de Crédito',
-        invoiceNumber: 'INV-2026-001'
-      },
-      {
-        id: 'p2',
-        restaurantId: 'r2',
-        restaurantName: 'Pizzaria Bella Napoli',
-        amount: 599,
-        status: 'PAID',
-        paidAt: '2026-01-20T14:45:00.000Z',
-        createdAt: '2026-01-20T00:00:00.000Z',
-        method: 'PIX',
-        invoiceNumber: 'INV-2026-002'
-      },
-      {
-        id: 'p3',
-        restaurantId: 'r4',
-        restaurantName: 'Cantina Italiana',
-        amount: 299,
-        status: 'PENDING',
-        paidAt: null,
-        createdAt: '2026-01-10T00:00:00.000Z',
-        method: 'Boleto',
-        invoiceNumber: 'INV-2026-003'
-      },
-      {
-        id: 'p4',
-        restaurantId: 'r5',
-        restaurantName: 'Café Central',
-        amount: 99,
-        status: 'PAID',
-        paidAt: '2026-01-01T09:00:00.000Z',
-        createdAt: '2026-01-01T00:00:00.000Z',
-        method: 'Cartão de Crédito',
-        invoiceNumber: 'INV-2026-004'
-      },
-      {
-        id: 'p5',
-        restaurantId: 'r6',
-        restaurantName: 'Bar do João',
-        amount: 99,
-        status: 'FAILED',
-        paidAt: null,
-        createdAt: '2026-01-08T00:00:00.000Z',
-        method: 'Cartão de Crédito',
-        invoiceNumber: 'INV-2026-005'
+      if (paymentsResponse.data && Array.isArray(paymentsResponse.data.data)) {
+        setPayments(paymentsResponse.data.data);
       }
-    ];
 
-    setSubscriptions(mockSubscriptions);
-    setPayments(mockPayments);
+      // Calcular métricas
+      if (subsResponse.data && paymentsResponse.data) {
+        const activeSubscriptions = (subsResponse.data.data || []).filter((s: Subscription) => s.status === 'ACTIVE');
+        const mrr = activeSubscriptions.reduce((acc: number, s: Subscription) => acc + s.amount, 0);
+        const paidPayments = (paymentsResponse.data.data || []).filter((p: Payment) => p.status === 'PAID');
+        const totalRevenue = paidPayments.reduce((acc: number, p: Payment) => acc + p.amount, 0);
 
-    const activeSubscriptions = mockSubscriptions.filter(s => s.status === 'ACTIVE');
-    const mrr = activeSubscriptions.reduce((acc, s) => acc + s.amount, 0);
-
-    setMetrics({
-      mrr,
-      mrrGrowth: 12.5,
-      arr: mrr * 12,
-      totalRevenue: mockPayments.filter(p => p.status === 'PAID').reduce((acc, p) => acc + p.amount, 0),
-      pendingPayments: mockPayments.filter(p => p.status === 'PENDING').length,
-      overduePayments: mockSubscriptions.filter(s => s.status === 'PAST_DUE').length,
-      averageRevenuePerUser: mrr / (activeSubscriptions.length || 1)
-    });
-
-    setLoading(false);
+        setMetrics({
+          mrr,
+          mrrGrowth: 12.5,
+          arr: mrr * 12,
+          totalRevenue,
+          pendingPayments: (paymentsResponse.data.data || []).filter((p: Payment) => p.status === 'PENDING').length,
+          overduePayments: (subsResponse.data.data || []).filter((s: Subscription) => s.status === 'PAST_DUE').length,
+          averageRevenuePerUser: mrr / Math.max(activeSubscriptions.length, 1)
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados de faturamento:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   };
 
   const filteredSubscriptions = subscriptions.filter(sub => {
