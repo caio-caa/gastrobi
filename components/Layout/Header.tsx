@@ -6,10 +6,10 @@ import {
   Bell,
   ChevronDown,
   LogOut,
-  Building2,
   AlertTriangle,
   Info,
   CheckCircle,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
@@ -19,10 +19,9 @@ interface HeaderProps {
 }
 
 function Header({ onMenuClick }: HeaderProps) {
-  const { user, logout, switchRestaurant } = useAuth();
+  const { user, logout } = useAuth();
   const { alerts, markAlertAsRead } = useData();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showRestaurantMenu, setShowRestaurantMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
   const unreadAlerts = alerts.filter((a) => !a.isRead);
@@ -77,75 +76,19 @@ function Header({ onMenuClick }: HeaderProps) {
 
           <div className="ml-2 lg:ml-0 min-w-0 flex-1">
             <h1 className="text-base lg:text-lg font-semibold text-gray-900 truncate">
-              {user?.currentRestaurant.name}
+              GastroBI Admin
             </h1>
             <div className="flex items-center space-x-2">
-              <p className="text-xs lg:text-sm text-gray-500 capitalize">
-                Plano {user?.currentRestaurant.plan}
+              <Shield className="w-3 h-3 text-blue-600" />
+              <p className="text-xs lg:text-sm text-gray-500">
+                Painel Administrativo SaaS
               </p>
-              <span
-                className={`px-2 py-1 text-xs font-medium rounded-full ${
-                  user?.currentRestaurant.status === 'active'
-                    ? 'bg-green-100 text-green-800'
-                    : user?.currentRestaurant.status === 'trial'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {user?.currentRestaurant.status === 'active'
-                  ? 'Ativo'
-                  : user?.currentRestaurant.status === 'trial'
-                  ? 'Trial'
-                  : 'Suspenso'}
-              </span>
             </div>
           </div>
         </div>
 
         {/* Right Section */}
         <div className="flex items-center space-x-2 lg:space-x-4">
-          {/* Seletor de Restaurante - Hidden on mobile */}
-          {user && user.restaurants.length > 1 && (
-            <div className="relative hidden md:block">
-              <button
-                onClick={() => setShowRestaurantMenu(!showRestaurantMenu)}
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <Building2 className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700 hidden lg:inline">
-                  Trocar Restaurante
-                </span>
-                <ChevronDown className="w-4 h-4 text-gray-500" />
-              </button>
-
-              {showRestaurantMenu && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-100 z-50">
-                  <div className="py-2">
-                    {user.restaurants.map((restaurant) => (
-                      <button
-                        key={restaurant.id}
-                        onClick={() => {
-                          switchRestaurant(restaurant.id);
-                          setShowRestaurantMenu(false);
-                        }}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                          restaurant.id === user.currentRestaurant.id
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'text-gray-700'
-                        }`}
-                      >
-                        <div className="font-medium">{restaurant.name}</div>
-                        <div className="text-xs text-gray-500 capitalize">
-                          Plano {restaurant.plan} • {restaurant.status}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Notificações */}
           <div className="relative">
             <button
@@ -262,45 +205,13 @@ function Header({ onMenuClick }: HeaderProps) {
                       Logado como
                     </p>
                     <p className="text-sm font-medium text-gray-900 capitalize">
-                      {user?.role === 'owner'
-                        ? 'Proprietário'
-                        : user?.role === 'manager'
-                        ? 'Gerente'
-                        : 'Funcionário'}
+                      {user?.role === 'super_admin'
+                        ? 'Super Admin'
+                        : user?.role === 'admin'
+                        ? 'Administrador'
+                        : user?.role}
                     </p>
                   </div>
-
-                  {/* Mobile Restaurant Selector */}
-                  {user && user.restaurants.length > 1 && (
-                    <div className="md:hidden border-b border-gray-100">
-                      <div className="px-4 py-2">
-                        <p className="text-xs text-gray-500 mb-2">
-                          Restaurantes
-                        </p>
-                        {user.restaurants.map((restaurant) => (
-                          <button
-                            key={restaurant.id}
-                            onClick={() => {
-                              switchRestaurant(restaurant.id);
-                              setShowUserMenu(false);
-                            }}
-                            className={`w-full text-left px-2 py-1 text-sm rounded hover:bg-gray-100 ${
-                              restaurant.id === user.currentRestaurant.id
-                                ? 'bg-blue-50 text-blue-700'
-                                : 'text-gray-700'
-                            }`}
-                          >
-                            <div className="font-medium truncate">
-                              {restaurant.name}
-                            </div>
-                            <div className="text-xs text-gray-500 capitalize">
-                              {restaurant.plan} • {restaurant.status}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   <button
                     onClick={() => {

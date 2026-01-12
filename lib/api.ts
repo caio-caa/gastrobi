@@ -20,66 +20,51 @@ interface PaginatedResponse<T> {
   take: number;
 }
 
-// Token management
-let accessToken: string | null = null;
-let refreshToken: string | null = null;
+// Token management with HTTP-Only Cookies
+// Tokens são gerenciados automaticamente pelo navegador via cookies httpOnly
+// Não é necessário manipular tokens manualmente via JavaScript
 
 export const setTokens = (access: string, refresh: string) => {
-  accessToken = access;
-  refreshToken = refresh;
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('gastrobi_access_token', access);
-    localStorage.setItem('gastrobi_refresh_token', refresh);
-  }
+  // Tokens são definidos pelo servidor via Set-Cookie headers (httpOnly)
+  // Esta função é mantida apenas para compatibilidade, não faz nada
 };
 
 export const getTokens = () => {
-  if (typeof window !== 'undefined' && !accessToken) {
-    accessToken = localStorage.getItem('gastrobi_access_token');
-    refreshToken = localStorage.getItem('gastrobi_refresh_token');
-  }
-  return { accessToken, refreshToken };
+  // Tokens são enviados automaticamente pelo navegador com credenciais
+  // Não é necessário recuperá-los via JavaScript
+  return { accessToken: null, refreshToken: null };
 };
 
 export const clearTokens = () => {
-  accessToken = null;
-  refreshToken = null;
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('gastrobi_access_token');
-    localStorage.removeItem('gastrobi_refresh_token');
-  }
+  // Tokens são limpos pelo servidor ao deslogar
+  // O servidor define cookies vazios/expirados
 };
 
-// Base fetch with auth
+// Base fetch with auth (cookies httpOnly)
 async function fetchWithAuth<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  const { accessToken } = getTokens();
-
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
 
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
-  }
-
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include', // Envia e recebe cookies httpOnly
     });
 
     // Handle token refresh on 401
-    if (response.status === 401 && refreshToken) {
+    if (response.status === 401) {
       const refreshed = await refreshAccessToken();
       if (refreshed) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
         const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
           ...options,
           headers,
+          credentials: 'include',
         });
         const data = await retryResponse.json().catch(() => null);
         return { data, status: retryResponse.status };
@@ -100,26 +85,21 @@ async function fetchWithAuth<T>(
 }
 
 async function refreshAccessToken(): Promise<boolean> {
-  const { refreshToken: token } = getTokens();
-  if (!token) return false;
-
   try {
     const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: token }),
+      credentials: 'include', // Envia e recebe cookies httpOnly
     });
 
     if (response.ok) {
-      const data = await response.json();
-      setTokens(data.accessToken, data.refreshToken);
+      // Os tokens são automaticamente salvos em cookies httpOnly pelo servidor
       return true;
     }
   } catch (error) {
     console.error('Token refresh error:', error);
   }
 
-  clearTokens();
   return false;
 }
 
@@ -149,9 +129,7 @@ export const authApi = {
       body: JSON.stringify({ email, password }),
     });
     
-    if (response.data) {
-      setTokens(response.data.accessToken, response.data.refreshToken);
-    }
+    // Tokens são automaticamente salvos em cookies httpOnly pelo servidor
     
     return response;
   },
@@ -162,9 +140,7 @@ export const authApi = {
       body: JSON.stringify({ email, password }),
     });
     
-    if (response.data) {
-      setTokens(response.data.accessToken, response.data.refreshToken);
-    }
+    // Tokens são automaticamente salvos em cookies httpOnly pelo servidor
     
     return response;
   },
@@ -173,7 +149,7 @@ export const authApi = {
 
   logout: async () => {
     const response = await fetchWithAuth('/auth/logout', { method: 'POST' });
-    clearTokens();
+    // Servidor limpa os cookies ao deslogar
     return response;
   },
 };

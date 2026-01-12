@@ -48,8 +48,8 @@ export default function LoginPage() {
     if (mode === 'login') {
       try {
         await login(email, password, rememberMe);
-        // Redirect to dashboard after successful login
-        router.push('/dashboard');
+        // Redirect to admin analytics after successful login
+        router.push('/admin/analytics');
       } catch (err: unknown) {
         if (err instanceof Error) {
           setError(err.message || 'Erro ao fazer login');

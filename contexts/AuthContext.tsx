@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api, { authApi } from '@/lib/api';
+import { authApi } from '@/lib/api';
 
 interface User {
   id: string;
@@ -45,37 +45,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const { accessToken } = api.getTokens();
-
-      if (accessToken) {
+      // Verificar se há usuário salvo localmente
+      const savedUser = localStorage.getItem('gastrobi_user_data');
+      
+      if (savedUser) {
+        const userData = JSON.parse(savedUser);
+        setUser(userData);
+        
+        // Se usando API real, validar sessão com o servidor
         if (USE_REAL_API) {
-          // Buscar usuário da API
-          const response = await authApi.me();
-          if (response.data) {
-            setUser({
-              id: response.data.id,
-              name: response.data.fullName,
-              email: response.data.email,
-              role: response.data.role.toLowerCase() as User['role'],
-              type: response.data.type,
-              permissions: ['all'],
-              lastLogin: new Date(),
-              isEmailVerified: true,
-              twoFactorEnabled: false,
-            });
-          }
-        } else {
-          // Usar dados salvos localmente
-          const savedUser = localStorage.getItem('gastrobi_user_data');
-          if (savedUser) {
-            const userData = JSON.parse(savedUser);
-            setUser(userData);
+          try {
+            const response = await authApi.me();
+            if (response.data) {
+              const validatedUser: User = {
+                id: response.data.id,
+                name: response.data.fullName,
+                email: response.data.email,
+                role: response.data.role.toLowerCase() as User['role'],
+                type: response.data.type,
+                permissions: ['all'],
+                lastLogin: new Date(),
+                isEmailVerified: true,
+                twoFactorEnabled: false,
+              };
+              setUser(validatedUser);
+              localStorage.setItem('gastrobi_user_data', JSON.stringify(validatedUser));
+            }
+          } catch {
+            // Sessão inválida, manter usuário local por agora
+            console.log('Sessão não validada, usando dados locais');
           }
         }
       }
     } catch (error) {
       console.error('Erro ao inicializar autenticação:', error);
-      api.clearTokens();
       localStorage.removeItem('gastrobi_user_data');
     } finally {
       setLoading(false);
@@ -132,9 +135,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             permissions: ['all'],
           };
 
-          // Simular tokens
-          const mockToken = btoa(JSON.stringify({ userId: '1', exp: Date.now() + 24 * 60 * 60 * 1000 }));
-          api.setTokens(mockToken, mockToken);
           localStorage.setItem('gastrobi_user_data', JSON.stringify(userData));
           setUser(userData);
         } else {
@@ -154,7 +154,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     setUser(null);
-    api.clearTokens();
     if (typeof window !== 'undefined') {
       localStorage.removeItem('gastrobi_user_data');
     }
