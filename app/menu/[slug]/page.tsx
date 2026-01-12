@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { 
   Search, 
   Clock, 
@@ -185,9 +186,12 @@ export default function PublicMenuPage() {
       {/* Header */}
       <div className="flex items-center justify-between p-4 text-white">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-            <ChefHat className="w-6 h-6" />
-          </div>
+          <Link 
+            href="/"
+            className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </Link>
           <div>
             <h1 className="text-lg font-bold">Hamburgueria do Zé</h1>
             <p className="text-sm opacity-90">Centro • São Paulo</p>

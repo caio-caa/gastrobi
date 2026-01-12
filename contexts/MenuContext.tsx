@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useAuth } from './AuthContext';
 
 interface MenuCategory {
   id: string;
@@ -93,20 +92,17 @@ interface MenuContextType {
 const MenuContext = createContext<MenuContextType | undefined>(undefined);
 
 export function MenuProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [products, setProducts] = useState<MenuProduct[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
 
   useEffect(() => {
-    // Inicializa dados sempre, independente do login
+    // Inicializa dados sempre
     initializeMenuData();
-  }, [user]);
+  }, []);
 
   const generateQRCode = (tableNumber: string): string => {
-    const restaurantSlug = user?.currentRestaurant?.name
-      .toLowerCase()
-      .replace(/\s+/g, '-') || 'restaurante';
+    const restaurantSlug = 'restaurante';
     const origin =
       typeof window !== 'undefined' ? window.location.origin : '';
     return `${origin}/menu/${restaurantSlug}?table=${tableNumber}`;
