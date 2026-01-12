@@ -122,9 +122,9 @@ export default function AdminRestaurantsPage() {
   };
 
   const filteredRestaurants = restaurants.filter(restaurant => {
-    const matchesSearch = restaurant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         restaurant.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         restaurant.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (restaurant.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (restaurant.slug || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (restaurant.email || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || restaurant.status === statusFilter;
     return matchesSearch && matchesStatus;
   });

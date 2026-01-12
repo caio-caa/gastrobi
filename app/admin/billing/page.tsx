@@ -129,15 +129,15 @@ export default function AdminBillingPage() {
   };
 
   const filteredSubscriptions = subscriptions.filter(sub => {
-    const matchesSearch = sub.restaurantName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (sub.restaurantName || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || sub.status === statusFilter;
     const matchesPlan = planFilter === 'all' || sub.plan === planFilter;
     return matchesSearch && matchesStatus && matchesPlan;
   });
 
   const filteredPayments = payments.filter(payment => {
-    const matchesSearch = payment.restaurantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         payment.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (payment.restaurantName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (payment.invoiceNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || payment.status === statusFilter;
     return matchesSearch && matchesStatus;
   });

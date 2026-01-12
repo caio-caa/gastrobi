@@ -220,8 +220,8 @@ export default function AdminUsersPage() {
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (user.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user.email || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = filterRole === 'all' || user.role === filterRole;
     const matchesStatus = filterStatus === 'all' || 
                          (filterStatus === 'active' && user.is_active) ||
@@ -230,8 +230,8 @@ export default function AdminUsersPage() {
   });
 
   const filteredRestaurants = restaurants.filter(restaurant => {
-    const matchesSearch = restaurant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         restaurant.slug.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (restaurant.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (restaurant.slug || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 

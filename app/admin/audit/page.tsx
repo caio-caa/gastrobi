@@ -96,9 +96,9 @@ export default function AdminAuditPage() {
   };
 
   const filteredLogs = logs.filter(log => {
-    const matchesSearch = log.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         log.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         log.entity.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (log.userEmail || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (log.userEmail || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (log.entity || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesAction = actionFilter === 'all' || log.action === actionFilter;
     const matchesEntity = entityFilter === 'all' || log.entity === entityFilter;
     
