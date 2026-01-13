@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChefHat, BarChart3, ShoppingCart, Users, Heart, Megaphone, Grid, LogOut } from 'lucide-react';
+import { ChefHat, BarChart3, ShoppingCart, Users, Heart, Megaphone, Grid, LogOut, Settings, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Header from '@/components/Layout/Header';
@@ -15,6 +15,8 @@ const menuItems = [
   { label: 'Clientes', href: 'customers', icon: Users },
   { label: 'Fidelidade', href: 'loyalty', icon: Heart },
   { label: 'Campanhas', href: 'campaigns', icon: Megaphone },
+  { label: 'Relatórios', href: 'reports', icon: TrendingUp },
+  { label: 'Configurações', href: 'settings', icon: Settings },
 ];
 
 export default function DashboardLayout({
