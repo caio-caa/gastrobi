@@ -56,7 +56,7 @@ export default function PublicMenuPage() {
   const searchParams = useSearchParams();
   const restaurantSlug = params.slug as string;
   const tableNumber = searchParams.get('table');
-  const { getPublicMenu } = useMenu();
+  const { getPublicMenu, loadMenu, restaurant, isLoading, error } = useMenu();
 
   // Estados principais
   const [step, setStep] = useState<'welcome' | 'location' | 'menu' | 'product' | 'cart' | 'loyalty'>('welcome');
@@ -79,14 +79,15 @@ export default function PublicMenuPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
 
-  // Estados do cliente
-  const [customerData, setCustomerData] = useState<CustomerData>({
-    name: 'João Silva',
-    phone: '(11) 99999-9999',
-    points: 87,
-    level: 'silver',
-    orders: 12
-  });
+  // Estados do cliente (will be loaded from API when customer auth is implemented)
+  const [customerData, setCustomerData] = useState<CustomerData | null>(null);
+
+  // Load menu when slug changes
+  React.useEffect(() => {
+    if (restaurantSlug) {
+      loadMenu(restaurantSlug);
+    }
+  }, [restaurantSlug, loadMenu]);
 
   const { categories, products } = getPublicMenu(restaurantSlug);
   
@@ -174,6 +175,7 @@ export default function PublicMenuPage() {
   };
 
   const getPointsToNextLevel = () => {
+    if (!customerData) return 0;
     const thresholds: Record<string, number> = { bronze: 0, silver: 100, gold: 300 };
     if (customerData.level === 'gold') return 0;
     const nextLevel = customerData.level === 'bronze' ? 'silver' : 'gold';
@@ -787,6 +789,41 @@ export default function PublicMenuPage() {
 
   // Componente Loyalty Screen
   const LoyaltyScreen = () => {
+    // If customer is not logged in, show login prompt
+    if (!customerData) {
+      return (
+        <div className="fixed inset-0 bg-white z-50 flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4">
+            <div className="flex items-center space-x-3">
+              <button onClick={() => setStep('menu')}>
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-lg font-bold">Programa de Fidelidade</h1>
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col items-center justify-center p-6">
+            <div className="w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mb-6">
+              <Gift className="w-12 h-12 text-purple-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Participe do Programa</h2>
+            <p className="text-gray-600 text-center mb-6">
+              Acumule pontos, ganhe recompensas e tenha benefícios exclusivos!
+            </p>
+            <div className="space-y-3 w-full max-w-sm">
+              <button className="w-full bg-purple-600 text-white py-3 rounded-xl font-semibold">
+                Entrar com WhatsApp
+              </button>
+              <button className="w-full bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold">
+                Criar conta
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const LevelIcon = getLevelIcon(customerData.level);
     const pointsToNext = getPointsToNextLevel();
     

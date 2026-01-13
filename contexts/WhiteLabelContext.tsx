@@ -177,39 +177,25 @@ export function WhiteLabelProvider({
   const fetchClientConfig = async (
     clientId: string
   ): Promise<Partial<WhiteLabelConfig> | null> => {
-    // Simulação - em produção seria uma chamada à API
-    const mockConfigs: Record<string, Partial<WhiteLabelConfig>> = {
-      'restaurantesystem.com': {
-        brandName: 'RestauranteSystem',
-        logo: '/logos/restaurantesystem-logo.svg',
-        primaryColor: '#dc2626',
-        secondaryColor: '#991b1b',
-        accentColor: '#f59e0b',
-        supportEmail: 'suporte@restaurantesystem.com',
-        website: 'https://restaurantesystem.com',
-        footerText: '© 2024 RestauranteSystem. Todos os direitos reservados.',
-        customizationLevel: 'enterprise',
-        clientId: 'restaurantesystem',
-        clientName: 'RestauranteSystem',
-        clientPlan: 'enterprise',
-      },
-      foodtech: {
-        brandName: 'FoodTech Pro',
-        logo: '/logos/foodtech-logo.svg',
-        primaryColor: '#059669',
-        secondaryColor: '#047857',
-        accentColor: '#8b5cf6',
-        supportEmail: 'help@foodtech.pro',
-        website: 'https://foodtech.pro',
-        footerText: '© 2024 FoodTech Pro. Todos os direitos reservados.',
-        customizationLevel: 'advanced',
-        clientId: 'foodtech',
-        clientName: 'FoodTech Pro',
-        clientPlan: 'premium',
-      },
-    };
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/white-label/config/${clientId}`
+      );
 
-    return mockConfigs[clientId] || null;
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(`Configuração white label não encontrada para: ${clientId}`);
+          return null;
+        }
+        throw new Error(`Erro ao buscar configuração: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.config || null;
+    } catch (error) {
+      console.error('Erro ao buscar configuração white label:', error);
+      return null;
+    }
   };
 
   const applyCustomStyles = (config: Partial<WhiteLabelConfig>) => {

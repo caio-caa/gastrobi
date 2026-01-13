@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { couponApi } from '@/lib/api';
 
 // Types
 interface CartItem {
@@ -195,26 +196,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   // Apply coupon
   const applyCoupon = useCallback(async (code: string): Promise<boolean> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Mock coupon validation
-    const validCoupons: Record<string, number> = {
-      'PRIMEIRA10': 0.10,
-      'DESCONTO15': 0.15,
-      'PROMO20': 0.20,
-    };
+    if (!restaurantSlug) return false;
 
-    const discountPercentage = validCoupons[code.toUpperCase()];
-    
-    if (discountPercentage) {
-      setCouponCode(code.toUpperCase());
-      setDiscount(subtotal * discountPercentage);
-      return true;
+    try {
+      const response = await couponApi.validate(restaurantSlug, {
+        code,
+        restaurantSlug,
+        subtotal,
+      });
+
+      if (response.data?.valid) {
+        setCouponCode(response.data.code);
+        setDiscount(response.data.calculatedDiscount);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error validating coupon:', error);
+      return false;
     }
-    
-    return false;
-  }, [subtotal]);
+  }, [subtotal, restaurantSlug]);
 
   // Remove coupon
   const removeCoupon = useCallback(() => {

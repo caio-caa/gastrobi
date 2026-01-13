@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   ChefHat, 
@@ -8,54 +8,58 @@ import {
   MapPin, 
   Star, 
   Clock,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from 'lucide-react';
 import { useWhiteLabel } from '@/contexts/WhiteLabelContext';
 
-// Restaurantes de exemplo (em produção viria da API)
-const restaurants = [
-  {
-    id: '1',
-    slug: 'restaurante-do-joao',
-    name: 'Restaurante do João',
-    description: 'Comida caseira com sabor de vó',
-    image: '/restaurant-1.jpg',
-    rating: 4.8,
-    reviews: 245,
-    cuisine: 'Brasileira',
-    deliveryTime: '30-45 min',
-    isOpen: true,
-  },
-  {
-    id: '2',
-    slug: 'pizzaria-express',
-    name: 'Pizzaria Express',
-    description: 'As melhores pizzas da cidade',
-    image: '/restaurant-2.jpg',
-    rating: 4.5,
-    reviews: 189,
-    cuisine: 'Italiana',
-    deliveryTime: '40-55 min',
-    isOpen: true,
-  },
-  {
-    id: '3',
-    slug: 'sushi-house',
-    name: 'Sushi House',
-    description: 'Sushi fresco feito na hora',
-    image: '/restaurant-3.jpg',
-    rating: 4.9,
-    reviews: 312,
-    cuisine: 'Japonesa',
-    deliveryTime: '35-50 min',
-    isOpen: false,
-  },
-];
+interface Restaurant {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  image?: string;
+  rating: number;
+  reviews: number;
+  cuisine: string;
+  deliveryTime: string;
+  isOpen: boolean;
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
 export default function HomePage() {
   const router = useRouter();
   const { config } = useWhiteLabel();
   const [searchTerm, setSearchTerm] = useState('');
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadRestaurants();
+  }, []);
+
+  const loadRestaurants = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch(`${API_URL}/restaurants/public`);
+      
+      if (!response.ok) {
+        throw new Error('Erro ao carregar restaurantes');
+      }
+      
+      const data = await response.json();
+      setRestaurants(data.restaurants || []);
+    } catch (err) {
+      console.error('Erro ao carregar restaurantes:', err);
+      setError('Não foi possível carregar os restaurantes. Tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredRestaurants = restaurants.filter(r =>
     r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -120,7 +124,33 @@ export default function HomePage() {
           </h2>
 
           <div className="space-y-4">
-            {filteredRestaurants.map((restaurant) => (
+            {isLoading ? (
+              <div className="text-center py-12">
+                <Loader2 
+                  className="w-8 h-8 animate-spin mx-auto mb-4" 
+                  style={{ color: config.primaryColor }}
+                />
+                <p className="text-gray-500">Carregando restaurantes...</p>
+              </div>
+            ) : error ? (
+              <div className="text-center py-12">
+                <MapPin className="w-12 h-12 text-red-300 mx-auto mb-4" />
+                <p className="text-red-500 mb-4">{error}</p>
+                <button
+                  onClick={loadRestaurants}
+                  className="px-4 py-2 rounded-lg text-white"
+                  style={{ backgroundColor: config.primaryColor }}
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            ) : filteredRestaurants.length === 0 ? (
+              <div className="text-center py-12">
+                <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">Nenhum restaurante encontrado</p>
+              </div>
+            ) : (
+              filteredRestaurants.map((restaurant) => (
               <button
                 key={restaurant.id}
                 onClick={() => handleRestaurantClick(restaurant.slug)}
@@ -176,15 +206,9 @@ export default function HomePage() {
                   <ArrowRight className="w-5 h-5 text-gray-400" />
                 )}
               </button>
-            ))}
+            ))
+            )}
           </div>
-
-          {filteredRestaurants.length === 0 && (
-            <div className="text-center py-12">
-              <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">Nenhum restaurante encontrado</p>
-            </div>
-          )}
         </div>
       </section>
 
