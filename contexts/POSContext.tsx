@@ -1,7 +1,11 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
+import { ordersApi, tablesApi } from '@/lib/api';
+import { useMenu } from './MenuContext';
+
+// ==================== INTERFACES ====================
 
 interface POSProduct {
   id: string;
@@ -32,11 +36,11 @@ interface POSOrder {
   status: 'open' | 'preparing' | 'ready' | 'completed' | 'cancelled';
   createdAt: Date;
   updatedAt: Date;
-
-  // Específicos por tipo
   tableNumber?: string;
+  tableId?: string;
   comandaNumber?: string;
   customer?: {
+    id?: string;
     name: string;
     phone: string;
     address?: string;
@@ -49,9 +53,11 @@ interface POSOrder {
 }
 
 interface Table {
+  id: string;
   number: string;
-  status: 'available' | 'occupied' | 'reserved';
-  currentOrder?: string;
+  capacity: number;
+  status: 'AVAILABLE' | 'OCCUPIED' | 'RESERVED' | 'CLEANING';
+  currentOrderId?: string;
   waiter?: string;
 }
 
@@ -65,43 +71,46 @@ interface Comanda {
   total: number;
 }
 
-interface POSContextType {
-  // Products
-  products: POSProduct[];
+interface KitchenItem extends POSOrderItem {
+  orderId: string;
+  orderType: string;
+  tableNumber?: string;
+  comandaNumber?: string;
+}
 
+interface POSContextType {
+  // Products (from menu)
+  products: POSProduct[];
+  
   // Orders
   orders: POSOrder[];
-  addOrder: (
-    order: Omit<POSOrder, 'id' | 'createdAt' | 'updatedAt'>
-  ) => string;
-  updateOrder: (id: string, updates: Partial<POSOrder>) => void;
-  updateOrderItem: (
-    orderId: string,
-    itemId: string,
-    updates: Partial<POSOrderItem>
-  ) => void;
-
+  isLoading: boolean;
+  addOrder: (order: Omit<POSOrder, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  updateOrder: (id: string, updates: Partial<POSOrder>) => Promise<void>;
+  updateOrderStatus: (id: string, status: string) => Promise<void>;
+  cancelOrder: (id: string) => Promise<void>;
+  
   // Tables
   tables: Table[];
-  updateTable: (number: string, updates: Partial<Table>) => void;
-
-  // Comandas
+  updateTableStatus: (id: string, status: string) => Promise<void>;
+  
+  // Comandas (local state - no API endpoint)
   comandas: Comanda[];
   createComanda: (tableNumber: string, waiterName: string) => string;
   closeComanda: (number: string) => void;
-
-  // Kitchen/Bar
-  getKitchenOrders: () => (POSOrderItem & { orderId: string; orderType: string; tableNumber?: string; comandaNumber?: string })[];
-  updateItemStatus: (
-    orderId: string,
-    itemId: string,
-    status: POSOrderItem['status']
-  ) => void;
-
+  
+  // Kitchen
+  getKitchenOrders: () => KitchenItem[];
+  updateItemStatus: (orderId: string, itemId: string, status: POSOrderItem['status']) => void;
+  
   // Delivery
   deliveryFees: { [neighborhood: string]: number };
   calculateDeliveryFee: (neighborhood: string) => number;
-
+  
+  // Refresh
+  refreshOrders: () => Promise<void>;
+  refreshKitchen: () => Promise<void>;
+  
   // Real-time updates
   subscribeToUpdates: (callback: () => void) => () => void;
 }
@@ -109,144 +118,250 @@ interface POSContextType {
 const POSContext = createContext<POSContextType | undefined>(undefined);
 
 export function POSProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  const [products, setProducts] = useState<POSProduct[]>([]);
+  const { user, isAuthenticated } = useAuth();
+  const { products: menuProducts, tables: menuTables, refreshTables } = useMenu();
+  
   const [orders, setOrders] = useState<POSOrder[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [comandas, setComandasState] = useState<Comanda[]>([]);
-  const [updateCallbacks, setUpdateCallbacks] = useState<(() => void)[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const updateCallbacksRef = useRef<(() => void)[]>([]);
 
+  const restaurantId = user?.currentRestaurant?.id;
+
+  // Delivery fees configuration
   const deliveryFees: { [neighborhood: string]: number } = {
-    Centro: 5.0,
+    'Centro': 5.0,
     'Bairro Alto': 7.0,
     'Vila Nova': 8.0,
     'Jardim América': 10.0,
-    Periferia: 12.0,
+    'Periferia': 12.0,
   };
 
-  useEffect(() => {
-    if (user) {
-      initializePOSData();
+  // ==================== MAPPERS ====================
+
+  const mapOrderTypeFromApi = (type: string): 'balcao' | 'delivery' | 'mesa' | 'comanda' => {
+    switch (type?.toUpperCase()) {
+      case 'DINE_IN': return 'mesa';
+      case 'TAKEOUT': return 'balcao';
+      case 'DELIVERY': return 'delivery';
+      default: return 'balcao';
     }
-  }, [user]);
-
-  const initializePOSData = () => {
-    // Mock products
-    const mockProducts: POSProduct[] = [
-      {
-        id: '1',
-        name: 'Hambúrguer Clássico',
-        price: 25.9,
-        category: 'Lanches',
-        isActive: true,
-        preparationTime: 15,
-      },
-      {
-        id: '2',
-        name: 'Pizza Margherita',
-        price: 35.9,
-        category: 'Pizzas',
-        isActive: true,
-        preparationTime: 20,
-      },
-      {
-        id: '3',
-        name: 'Refrigerante Lata',
-        price: 5.5,
-        category: 'Bebidas',
-        isActive: true,
-        preparationTime: 1,
-      },
-      {
-        id: '4',
-        name: 'Batata Frita',
-        price: 12.9,
-        category: 'Acompanhamentos',
-        isActive: true,
-        preparationTime: 10,
-      },
-      {
-        id: '5',
-        name: 'Cerveja Long Neck',
-        price: 8.9,
-        category: 'Bebidas',
-        isActive: true,
-        preparationTime: 2,
-      },
-    ];
-
-    // Mock tables
-    const mockTables: Table[] = Array.from({ length: 20 }, (_, i) => ({
-      number: String(i + 1).padStart(2, '0'),
-      status: 'available' as const,
-    }));
-
-    setProducts(mockProducts);
-    setTables(mockTables);
   };
 
-  const notifyUpdates = () => {
-    updateCallbacks.forEach((callback) => callback());
+  const mapOrderTypeToApi = (type: string): string => {
+    switch (type) {
+      case 'mesa': return 'DINE_IN';
+      case 'balcao': return 'TAKEOUT';
+      case 'delivery': return 'DELIVERY';
+      case 'comanda': return 'DINE_IN';
+      default: return 'TAKEOUT';
+    }
   };
 
-  const addOrder = (
-    orderData: Omit<POSOrder, 'id' | 'createdAt' | 'updatedAt'>
-  ): string => {
-    const newOrder: POSOrder = {
-      ...orderData,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
+  const mapOrderStatusFromApi = (status: string): 'open' | 'preparing' | 'ready' | 'completed' | 'cancelled' => {
+    switch (status?.toUpperCase()) {
+      case 'PENDING':
+      case 'CONFIRMED': return 'open';
+      case 'PREPARING': return 'preparing';
+      case 'READY': return 'ready';
+      case 'DELIVERED':
+      case 'COMPLETED': return 'completed';
+      case 'CANCELLED': return 'cancelled';
+      default: return 'open';
+    }
+  };
+
+  const mapOrderFromApi = (o: any): POSOrder => ({
+    id: o.id,
+    type: mapOrderTypeFromApi(o.type),
+    items: (o.items || []).map((item: any) => ({
+      id: item.id || Date.now().toString(),
+      productId: item.productId,
+      productName: item.productName || item.product?.name || '',
+      price: item.price || 0,
+      quantity: item.quantity || 1,
+      observations: item.observations || item.notes,
+      status: mapItemStatusFromApi(item.status),
+      addedAt: item.addedAt ? new Date(item.addedAt) : new Date()
+    })),
+    total: o.total || 0,
+    status: mapOrderStatusFromApi(o.status),
+    createdAt: o.createdAt ? new Date(o.createdAt) : new Date(),
+    updatedAt: o.updatedAt ? new Date(o.updatedAt) : new Date(),
+    tableNumber: o.table?.number || o.tableNumber,
+    tableId: o.tableId,
+    customer: o.customer ? {
+      id: o.customer.id,
+      name: o.customer.name || '',
+      phone: o.customer.phone || '',
+      address: o.customer.address,
+      neighborhood: o.customer.neighborhood,
+      deliveryFee: o.deliveryFee
+    } : undefined,
+    paymentMethod: o.paymentMethod?.toLowerCase(),
+    notes: o.notes
+  });
+
+  const mapItemStatusFromApi = (status: string): 'pending' | 'preparing' | 'ready' | 'delivered' => {
+    switch (status?.toUpperCase()) {
+      case 'PENDING': return 'pending';
+      case 'PREPARING': return 'preparing';
+      case 'READY': return 'ready';
+      case 'DELIVERED': return 'delivered';
+      default: return 'pending';
+    }
+  };
+
+  const mapTableFromMenu = (t: any): Table => ({
+    id: t.id,
+    number: t.number,
+    capacity: t.capacity || 4,
+    status: t.status || 'AVAILABLE',
+    currentOrderId: t.currentOrderId,
+    waiter: t.waiter
+  });
+
+  // ==================== PRODUCTS (from Menu) ====================
+
+  const products: POSProduct[] = menuProducts.map(p => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    category: p.category,
+    image: p.image,
+    isActive: p.isActive && p.isAvailable,
+    preparationTime: p.preparationTime
+  }));
+
+  // ==================== DATA LOADING ====================
+
+  const refreshOrders = useCallback(async () => {
+    if (!restaurantId) return;
+    
+    try {
+      const response = await ordersApi.list(restaurantId);
+      if (response.data) {
+        const apiData = Array.isArray(response.data) ? response.data : response.data.data || [];
+        setOrders(apiData.map(mapOrderFromApi));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar pedidos:', error);
+    }
+  }, [restaurantId]);
+
+  const refreshKitchen = useCallback(async () => {
+    if (!restaurantId) return;
+    
+    try {
+      const response = await ordersApi.kitchen(restaurantId);
+      if (response.data) {
+        const apiData = Array.isArray(response.data) ? response.data : response.data.data || [];
+        // Update orders with kitchen data
+        setOrders(prev => {
+          const kitchenOrders = apiData.map(mapOrderFromApi);
+          const existingIds = new Set(kitchenOrders.map((o: POSOrder) => o.id));
+          const otherOrders = prev.filter(o => !existingIds.has(o.id));
+          return [...otherOrders, ...kitchenOrders];
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar pedidos da cozinha:', error);
+    }
+  }, [restaurantId]);
+
+  // Sync tables from MenuContext
+  useEffect(() => {
+    setTables(menuTables.map(mapTableFromMenu));
+  }, [menuTables]);
+
+  // Initial data load
+  useEffect(() => {
+    if (isAuthenticated && restaurantId) {
+      setIsLoading(true);
+      Promise.all([refreshOrders(), refreshKitchen()])
+        .finally(() => setIsLoading(false));
+    }
+  }, [isAuthenticated, restaurantId, refreshOrders, refreshKitchen]);
+
+  // ==================== ORDER ACTIONS ====================
+
+  const addOrder = async (orderData: Omit<POSOrder, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+    if (!restaurantId) return '';
+    
+    // Map order for API
+    const apiOrder = {
+      type: mapOrderTypeToApi(orderData.type),
+      tableId: orderData.tableId,
+      customerId: orderData.customer?.id,
+      items: orderData.items.map(item => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        price: item.price,
+        notes: item.observations
+      })),
+      notes: orderData.notes,
+      deliveryAddress: orderData.customer?.address,
+      deliveryFee: orderData.customer?.deliveryFee
     };
 
-    setOrders((prev) => [...prev, newOrder]);
-    notifyUpdates();
-    return newOrder.id;
+    const response = await ordersApi.create(apiOrder, restaurantId);
+    
+    if (response.data) {
+      await refreshOrders();
+      notifySubscribers();
+      return response.data.id;
+    } else {
+      throw new Error(response.error || 'Erro ao criar pedido');
+    }
   };
 
-  const updateOrder = (id: string, updates: Partial<POSOrder>) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === id
-          ? { ...order, ...updates, updatedAt: new Date() }
-          : order
-      )
-    );
-    notifyUpdates();
+  const updateOrder = async (id: string, updates: Partial<POSOrder>) => {
+    // Local update for now (API doesn't have full order update)
+    setOrders(prev => prev.map(o => 
+      o.id === id ? { ...o, ...updates, updatedAt: new Date() } : o
+    ));
+    notifySubscribers();
   };
 
-  const updateOrderItem = (
-    orderId: string,
-    itemId: string,
-    updates: Partial<POSOrderItem>
-  ) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === orderId
-          ? {
-              ...order,
-              items: order.items.map((item) =>
-                item.id === itemId ? { ...item, ...updates } : item
-              ),
-              updatedAt: new Date(),
-            }
-          : order
-      )
-    );
-    notifyUpdates();
+  const updateOrderStatus = async (id: string, status: string) => {
+    if (!restaurantId) return;
+    
+    const response = await ordersApi.updateStatus(id, status, restaurantId);
+    if (response.data || response.status === 200) {
+      await refreshOrders();
+      notifySubscribers();
+    } else {
+      throw new Error(response.error || 'Erro ao atualizar status do pedido');
+    }
   };
 
-  const updateTable = (number: string, updates: Partial<Table>) => {
-    setTables((prev) =>
-      prev.map((table) =>
-        table.number === number ? { ...table, ...updates } : table
-      )
-    );
-    notifyUpdates();
+  const cancelOrder = async (id: string) => {
+    if (!restaurantId) return;
+    
+    const response = await ordersApi.cancel(id, restaurantId);
+    if (response.data || response.status === 200) {
+      await refreshOrders();
+      notifySubscribers();
+    } else {
+      throw new Error(response.error || 'Erro ao cancelar pedido');
+    }
   };
+
+  // ==================== TABLE ACTIONS ====================
+
+  const updateTableStatus = async (id: string, status: string) => {
+    if (!restaurantId) return;
+    
+    await tablesApi.updateStatus(id, status, restaurantId);
+    await refreshTables();
+    notifySubscribers();
+  };
+
+  // ==================== COMANDA ACTIONS (Local) ====================
 
   const createComanda = (tableNumber: string, waiterName: string): string => {
-    const comandaNumber = `C${Date.now().toString().slice(-4)}`;
+    const comandaNumber = `C${Date.now()}`;
     const newComanda: Comanda = {
       number: comandaNumber,
       tableNumber,
@@ -254,88 +369,127 @@ export function POSProvider({ children }: { children: React.ReactNode }) {
       orders: [],
       status: 'open',
       openedAt: new Date(),
-      total: 0,
+      total: 0
     };
-
-    setComandasState((prev) => [...prev, newComanda]);
-    updateTable(tableNumber, { status: 'occupied', waiter: waiterName });
-    notifyUpdates();
+    setComandasState(prev => [...prev, newComanda]);
+    notifySubscribers();
     return comandaNumber;
   };
 
   const closeComanda = (number: string) => {
-    setComandasState((prev) =>
-      prev.map((comanda) =>
-        comanda.number === number ? { ...comanda, status: 'closed' } : comanda
-      )
+    setComandasState(prev => 
+      prev.map(c => c.number === number ? { ...c, status: 'closed' as const } : c)
     );
-
-    const comanda = comandas.find((c) => c.number === number);
-    if (comanda?.tableNumber) {
-      updateTable(comanda.tableNumber, {
-        status: 'available',
-        waiter: undefined,
-        currentOrder: undefined,
-      });
-    }
-    notifyUpdates();
+    notifySubscribers();
   };
 
-  const getKitchenOrders = (): (POSOrderItem & { orderId: string; orderType: string; tableNumber?: string; comandaNumber?: string })[] => {
-    return orders
-      .filter(
-        (order) =>
-          order.status !== 'completed' && order.status !== 'cancelled'
-      )
-      .flatMap((order) =>
+  // ==================== KITCHEN ====================
+
+  const getKitchenOrders = (): KitchenItem[] => {
+    const kitchenItems: KitchenItem[] = [];
+    
+    orders
+      .filter(o => o.status === 'open' || o.status === 'preparing')
+      .forEach(order => {
         order.items
-          .filter((item) => item.status !== 'delivered')
-          .map((item) => ({
-            ...item,
-            orderId: order.id,
-            orderType: order.type,
-            tableNumber: order.tableNumber,
-            comandaNumber: order.comandaNumber,
-          }))
-      );
+          .filter(item => item.status !== 'delivered')
+          .forEach(item => {
+            kitchenItems.push({
+              ...item,
+              orderId: order.id,
+              orderType: order.type,
+              tableNumber: order.tableNumber,
+              comandaNumber: order.comandaNumber
+            });
+          });
+      });
+    
+    return kitchenItems.sort((a, b) => 
+      new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime()
+    );
   };
 
-  const updateItemStatus = (
-    orderId: string,
-    itemId: string,
-    status: POSOrderItem['status']
-  ) => {
-    updateOrderItem(orderId, itemId, { status });
+  const updateItemStatus = (orderId: string, itemId: string, status: POSOrderItem['status']) => {
+    setOrders(prev => prev.map(order => {
+      if (order.id === orderId) {
+        const updatedItems = order.items.map(item =>
+          item.id === itemId ? { ...item, status } : item
+        );
+        
+        // Check if all items are ready or delivered
+        const allReady = updatedItems.every(item => 
+          item.status === 'ready' || item.status === 'delivered'
+        );
+        
+        return {
+          ...order,
+          items: updatedItems,
+          status: allReady ? 'ready' as const : 'preparing' as const,
+          updatedAt: new Date()
+        };
+      }
+      return order;
+    }));
+    notifySubscribers();
   };
+
+  // ==================== DELIVERY ====================
 
   const calculateDeliveryFee = (neighborhood: string): number => {
-    return deliveryFees[neighborhood] || 15.0; // Taxa padrão
+    return deliveryFees[neighborhood] || 15.0;
   };
 
-  const subscribeToUpdates = (callback: () => void): (() => void) => {
-    setUpdateCallbacks((prev) => [...prev, callback]);
+  // ==================== SUBSCRIBERS ====================
+
+  const notifySubscribers = () => {
+    updateCallbacksRef.current.forEach(callback => callback());
+  };
+
+  const subscribeToUpdates = (callback: () => void) => {
+    updateCallbacksRef.current.push(callback);
     return () => {
-      setUpdateCallbacks((prev) => prev.filter((cb) => cb !== callback));
+      updateCallbacksRef.current = updateCallbacksRef.current.filter(cb => cb !== callback);
     };
   };
+
+  // ==================== CONTEXT VALUE ====================
 
   return (
     <POSContext.Provider
       value={{
+        // Products
         products,
+        
+        // Orders
         orders,
+        isLoading,
         addOrder,
         updateOrder,
-        updateOrderItem,
+        updateOrderStatus,
+        cancelOrder,
+        
+        // Tables
         tables,
-        updateTable,
+        updateTableStatus,
+        
+        // Comandas
         comandas,
         createComanda,
         closeComanda,
+        
+        // Kitchen
         getKitchenOrders,
         updateItemStatus,
+        
+        // Delivery
         deliveryFees,
         calculateDeliveryFee,
+        
+        // Refresh
+        refreshOrders,
+        refreshKitchen,
+        
+        // Subscribers
         subscribeToUpdates,
       }}
     >

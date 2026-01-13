@@ -1,18 +1,25 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { categoriesApi, productsApi, tablesApi } from '@/lib/api';
+
+// ==================== INTERFACES ====================
 
 interface MenuCategory {
   id: string;
   name: string;
   description?: string;
+  image?: string;
   order: number;
   isActive: boolean;
   schedule?: {
     startTime: string;
     endTime: string;
     days: string[];
+  };
+  _count?: {
+    products: number;
   };
 }
 
@@ -67,403 +74,408 @@ interface MenuProduct {
 interface Table {
   id: string;
   number: string;
-  qrCode: string;
+  capacity: number;
+  status: 'AVAILABLE' | 'OCCUPIED' | 'RESERVED' | 'CLEANING';
+  qrCode?: string;
   isActive: boolean;
 }
 
 interface MenuContextType {
+  // State
   categories: MenuCategory[];
   products: MenuProduct[];
   tables: Table[];
-  addCategory: (category: Omit<MenuCategory, 'id'>) => void;
-  updateCategory: (id: string, category: Partial<MenuCategory>) => void;
-  deleteCategory: (id: string) => void;
-  addProduct: (product: Omit<MenuProduct, 'id'>) => void;
-  updateProduct: (id: string, product: Partial<MenuProduct>) => void;
-  deleteProduct: (id: string) => void;
-  reorderProducts: (categoryId: string, productIds: string[]) => void;
-  generateTableQR: (tableNumber: string) => string;
-  getPublicMenu: (restaurantSlug?: string) => {
-    categories: MenuCategory[];
-    products: MenuProduct[];
-  };
+  isLoading: boolean;
+  
+  // Category Actions
+  addCategory: (category: Partial<MenuCategory>) => Promise<void>;
+  updateCategory: (id: string, category: Partial<MenuCategory>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  reorderCategories: (categoryIds: string[]) => Promise<void>;
+  
+  // Product Actions
+  addProduct: (product: Partial<MenuProduct>) => Promise<void>;
+  updateProduct: (id: string, product: Partial<MenuProduct>) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
+  toggleProductAvailability: (id: string) => Promise<void>;
+  reorderProducts: (categoryId: string, productIds: string[]) => Promise<void>;
+  
+  // Table Actions
+  addTable: (table: Partial<Table>) => Promise<void>;
+  updateTable: (id: string, table: Partial<Table>) => Promise<void>;
+  deleteTable: (id: string) => Promise<void>;
+  updateTableStatus: (id: string, status: string) => Promise<void>;
+  generateTableQR: (tableId: string) => Promise<string>;
+  
+  // Helpers
+  getPublicMenu: () => { categories: MenuCategory[]; products: MenuProduct[] };
   getAvailableProducts: () => MenuProduct[];
+  
+  // Refresh
+  refreshCategories: () => Promise<void>;
+  refreshProducts: () => Promise<void>;
+  refreshTables: () => Promise<void>;
+  refreshAll: () => Promise<void>;
 }
 
 const MenuContext = createContext<MenuContextType | undefined>(undefined);
 
 export function MenuProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [products, setProducts] = useState<MenuProduct[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const restaurantId = user?.currentRestaurant?.id;
+
+  // ==================== MAPPERS ====================
+
+  const mapCategoryFromApi = (c: any): MenuCategory => ({
+    id: c.id,
+    name: c.name || '',
+    description: c.description || '',
+    image: c.image,
+    order: c.order || 0,
+    isActive: c.isActive !== false,
+    schedule: c.schedule,
+    _count: c._count
+  });
+
+  const mapProductFromApi = (p: any, categoryName?: string): MenuProduct => ({
+    id: p.id,
+    name: p.name || '',
+    description: p.description || '',
+    price: p.price || 0,
+    originalPrice: p.originalPrice,
+    cost: p.cost || 0,
+    category: categoryName || p.category?.name || '',
+    categoryId: p.categoryId || '',
+    image: p.image,
+    isActive: p.isActive !== false,
+    isAvailable: p.isAvailable !== false,
+    isPromotion: p.isPromotion || false,
+    isBestSeller: p.isBestSeller || false,
+    isNew: p.isNew || false,
+    allergens: p.allergens || [],
+    preparationTime: p.preparationTime || 0,
+    order: p.order || 0,
+    variations: p.variations || [],
+    extras: p.extras || [],
+    schedule: p.schedule,
+    nutritionalInfo: p.nutritionalInfo,
+    tags: p.tags || []
+  });
+
+  const mapTableFromApi = (t: any): Table => ({
+    id: t.id,
+    number: t.number || '',
+    capacity: t.capacity || 4,
+    status: t.status || 'AVAILABLE',
+    qrCode: t.qrCode,
+    isActive: t.isActive !== false
+  });
+
+  // ==================== DATA LOADING ====================
+
+  const refreshCategories = useCallback(async () => {
+    if (!restaurantId) return;
+    
+    try {
+      const response = await categoriesApi.list(restaurantId);
+      if (response.data) {
+        const responseData = response.data as any;
+        const apiData = Array.isArray(responseData) ? responseData : responseData.data || [];
+        const mapped = apiData.map(mapCategoryFromApi) as MenuCategory[];
+        setCategories(mapped.sort((a: MenuCategory, b: MenuCategory) => a.order - b.order));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar categorias:', error);
+    }
+  }, [restaurantId]);
+
+  const refreshProducts = useCallback(async () => {
+    if (!restaurantId) return;
+    
+    try {
+      const response = await productsApi.list(restaurantId);
+      if (response.data) {
+        const responseData = response.data as any;
+        const apiData = Array.isArray(responseData) ? responseData : responseData.data || [];
+        
+        // Map products with category names
+        const mappedProducts = apiData.map((p: any) => {
+          const category = categories.find(c => c.id === p.categoryId);
+          return mapProductFromApi(p, category?.name);
+        }) as MenuProduct[];
+        
+        setProducts(mappedProducts.sort((a: MenuProduct, b: MenuProduct) => a.order - b.order));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
+    }
+  }, [restaurantId, categories]);
+
+  const refreshTables = useCallback(async () => {
+    if (!restaurantId) return;
+    
+    try {
+      const response = await tablesApi.list(restaurantId);
+      if (response.data) {
+        const responseData = response.data as any;
+        const apiData = Array.isArray(responseData) ? responseData : responseData.data || [];
+        setTables(apiData.map(mapTableFromApi));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar mesas:', error);
+    }
+  }, [restaurantId]);
+
+  const refreshAll = useCallback(async () => {
+    if (!restaurantId) return;
+    
+    setIsLoading(true);
+    try {
+      await refreshCategories();
+      await refreshProducts();
+      await refreshTables();
+    } finally {
+      setIsLoading(false);
+    }
+  }, [restaurantId, refreshCategories, refreshProducts, refreshTables]);
+
+  // ==================== EFFECTS ====================
 
   useEffect(() => {
-    // Inicializa dados sempre, independente do login
-    initializeMenuData();
-  }, [user]);
+    if (isAuthenticated && restaurantId) {
+      refreshAll();
+    }
+  }, [isAuthenticated, restaurantId]);
 
-  const generateQRCode = (tableNumber: string): string => {
-    const restaurantSlug = user?.currentRestaurant?.name
-      .toLowerCase()
-      .replace(/\s+/g, '-') || 'restaurante';
-    const origin =
-      typeof window !== 'undefined' ? window.location.origin : '';
-    return `${origin}/menu/${restaurantSlug}?table=${tableNumber}`;
-  };
+  // Refresh products when categories change (to get category names)
+  useEffect(() => {
+    if (categories.length > 0 && restaurantId) {
+      refreshProducts();
+    }
+  }, [categories, restaurantId]);
 
-  const initializeMenuData = () => {
-    // Categorias mockadas
-    const mockCategories: MenuCategory[] = [
-      {
-        id: '1',
-        name: 'Pizzas',
-        description: 'Pizzas artesanais com massa tradicional',
-        order: 1,
-        isActive: true,
-      },
-      {
-        id: '2',
-        name: 'Lanches',
-        description: 'Hambúrguers e sanduíches gourmet',
-        order: 2,
-        isActive: true,
-      },
-      {
-        id: '3',
-        name: 'Bebidas',
-        description: 'Refrigerantes, sucos e bebidas especiais',
-        order: 3,
-        isActive: true,
-      },
-      {
-        id: '4',
-        name: 'Sobremesas',
-        description: 'Doces e sobremesas da casa',
-        order: 4,
-        isActive: true,
-      },
-      {
-        id: '5',
-        name: 'Pratos Executivos',
-        description: 'Pratos completos para o almoço',
-        order: 5,
-        isActive: true,
-        schedule: {
-          startTime: '11:00',
-          endTime: '15:00',
-          days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-        },
-      },
-    ];
+  // ==================== CATEGORY ACTIONS ====================
 
-    // Produtos mockados
-    const mockProducts: MenuProduct[] = [
-      {
-        id: '1',
-        name: 'Pizza Margherita',
-        description:
-          'Molho de tomate, mussarela, manjericão fresco e azeite',
-        price: 45.9,
-        cost: 18.5,
-        category: 'Pizzas',
-        categoryId: '1',
-        image:
-          'https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=400',
-        isActive: true,
-        isAvailable: true,
-        isPromotion: false,
-        isBestSeller: true,
-        isNew: false,
-        allergens: ['Glúten', 'Lactose'],
-        preparationTime: 15,
-        order: 1,
-        variations: [
-          { id: '1', name: 'Pequena', price: 35.9, isDefault: false },
-          { id: '2', name: 'Média', price: 45.9, isDefault: true },
-          { id: '3', name: 'Grande', price: 55.9, isDefault: false },
-        ],
-        extras: [
-          { id: '1', name: 'Borda recheada', price: 8.0 },
-          { id: '2', name: 'Queijo extra', price: 5.0 },
-          { id: '3', name: 'Azeitona', price: 3.0 },
-        ],
-        nutritionalInfo: {
-          calories: 280,
-          protein: 12,
-          carbs: 35,
-          fat: 10,
-        },
-        tags: ['Vegetariano', 'Clássico'],
-      },
-      {
-        id: '2',
-        name: 'Pizza Pepperoni',
-        description: 'Molho de tomate, mussarela e pepperoni',
-        price: 52.9,
-        cost: 22.0,
-        category: 'Pizzas',
-        categoryId: '1',
-        image:
-          'https://images.pexels.com/photos/1146760/pexels-photo-1146760.jpeg?auto=compress&cs=tinysrgb&w=400',
-        isActive: true,
-        isAvailable: true,
-        isPromotion: true,
-        originalPrice: 58.9,
-        isBestSeller: false,
-        isNew: false,
-        allergens: ['Glúten', 'Lactose'],
-        preparationTime: 15,
-        order: 2,
-        variations: [
-          { id: '1', name: 'Pequena', price: 42.9, isDefault: false },
-          { id: '2', name: 'Média', price: 52.9, isDefault: true },
-          { id: '3', name: 'Grande', price: 62.9, isDefault: false },
-        ],
-        tags: ['Picante'],
-      },
-      {
-        id: '3',
-        name: 'Hambúrguer Artesanal',
-        description:
-          'Pão brioche, carne 180g, queijo cheddar, alface, tomate e molho especial',
-        price: 32.9,
-        cost: 15.2,
-        category: 'Lanches',
-        categoryId: '2',
-        image:
-          'https://images.pexels.com/photos/1639557/pexels-photo-1639557.jpeg?auto=compress&cs=tinysrgb&w=400',
-        isActive: true,
-        isAvailable: true,
-        isPromotion: false,
-        isBestSeller: true,
-        isNew: true,
-        allergens: ['Glúten', 'Lactose'],
-        preparationTime: 12,
-        order: 1,
-        variations: [
-          { id: '1', name: 'Simples', price: 32.9, isDefault: true },
-          { id: '2', name: 'Duplo', price: 42.9, isDefault: false },
-        ],
-        extras: [
-          { id: '1', name: 'Bacon', price: 6.0 },
-          { id: '2', name: 'Ovo', price: 4.0 },
-          { id: '3', name: 'Batata frita', price: 8.0 },
-        ],
-        tags: ['Artesanal', 'Gourmet'],
-      },
-      {
-        id: '4',
-        name: 'Refrigerante Lata',
-        description: 'Coca-Cola, Pepsi, Guaraná ou Fanta - 350ml',
-        price: 6.5,
-        cost: 2.8,
-        category: 'Bebidas',
-        categoryId: '3',
-        image:
-          'https://images.pexels.com/photos/50593/coca-cola-cold-drink-soft-drink-coke-50593.jpeg?auto=compress&cs=tinysrgb&w=400',
-        isActive: true,
-        isAvailable: true,
-        isPromotion: false,
-        isBestSeller: false,
-        isNew: false,
-        allergens: [],
-        preparationTime: 1,
-        order: 1,
-        variations: [
-          { id: '1', name: 'Coca-Cola', price: 6.5, isDefault: true },
-          { id: '2', name: 'Pepsi', price: 6.5, isDefault: false },
-          { id: '3', name: 'Guaraná', price: 6.5, isDefault: false },
-          { id: '4', name: 'Fanta', price: 6.5, isDefault: false },
-        ],
-        tags: ['Gelado'],
-      },
-      {
-        id: '5',
-        name: 'Pudim de Leite',
-        description: 'Pudim caseiro com calda de caramelo',
-        price: 12.9,
-        cost: 4.5,
-        category: 'Sobremesas',
-        categoryId: '4',
-        image:
-          'https://images.pexels.com/photos/1126359/pexels-photo-1126359.jpeg?auto=compress&cs=tinysrgb&w=400',
-        isActive: true,
-        isAvailable: false,
-        isPromotion: false,
-        isBestSeller: false,
-        isNew: false,
-        allergens: ['Lactose', 'Ovo'],
-        preparationTime: 5,
-        order: 1,
-        nutritionalInfo: {
-          calories: 220,
-          protein: 6,
-          carbs: 35,
-          fat: 8,
-        },
-        tags: ['Caseiro', 'Tradicional'],
-      },
-      {
-        id: '6',
-        name: 'Prato Executivo - Frango Grelhado',
-        description:
-          'Frango grelhado, arroz, feijão, batata frita e salada',
-        price: 24.9,
-        cost: 12.0,
-        category: 'Pratos Executivos',
-        categoryId: '5',
-        image:
-          'https://images.pexels.com/photos/106343/pexels-photo-106343.jpeg?auto=compress&cs=tinysrgb&w=400',
-        isActive: true,
-        isAvailable: true,
-        isPromotion: false,
-        isBestSeller: true,
-        isNew: false,
-        allergens: [],
-        preparationTime: 20,
-        order: 1,
-        schedule: {
-          startTime: '11:00',
-          endTime: '15:00',
-          days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-        },
-        nutritionalInfo: {
-          calories: 650,
-          protein: 45,
-          carbs: 60,
-          fat: 18,
-        },
-        tags: ['Completo', 'Saudável'],
-      },
-    ];
-
-    // Mesas mockadas
-    const mockTables: Table[] = [
-      { id: '1', number: '01', qrCode: generateQRCode('01'), isActive: true },
-      { id: '2', number: '02', qrCode: generateQRCode('02'), isActive: true },
-      { id: '3', number: '03', qrCode: generateQRCode('03'), isActive: true },
-      { id: '4', number: '04', qrCode: generateQRCode('04'), isActive: true },
-      { id: '5', number: '05', qrCode: generateQRCode('05'), isActive: true },
-    ];
-
-    setCategories(mockCategories);
-    setProducts(mockProducts);
-    setTables(mockTables);
-  };
-
-  const addCategory = (categoryData: Omit<MenuCategory, 'id'>) => {
-    const newCategory: MenuCategory = {
-      ...categoryData,
-      id: Date.now().toString(),
-    };
-    setCategories([...categories, newCategory]);
-  };
-
-  const updateCategory = (id: string, categoryData: Partial<MenuCategory>) => {
-    setCategories(
-      categories.map((c) => (c.id === id ? { ...c, ...categoryData } : c))
-    );
-  };
-
-  const deleteCategory = (id: string) => {
-    setCategories(categories.filter((c) => c.id !== id));
-    setProducts(products.filter((p) => p.categoryId !== id));
-  };
-
-  const addProduct = (productData: Omit<MenuProduct, 'id'>) => {
-    const newProduct: MenuProduct = {
-      ...productData,
-      id: Date.now().toString(),
-    };
-    setProducts([...products, newProduct]);
-  };
-
-  const updateProduct = (id: string, productData: Partial<MenuProduct>) => {
-    setProducts(
-      products.map((p) => (p.id === id ? { ...p, ...productData } : p))
-    );
-  };
-
-  const deleteProduct = (id: string) => {
-    setProducts(products.filter((p) => p.id !== id));
-  };
-
-  const reorderProducts = (categoryId: string, productIds: string[]) => {
-    const updatedProducts = products.map((product) => {
-      if (product.categoryId === categoryId) {
-        const newOrder = productIds.indexOf(product.id);
-        return { ...product, order: newOrder };
-      }
-      return product;
-    });
-    setProducts(updatedProducts);
-  };
-
-  const generateTableQR = (tableNumber: string): string => {
-    return generateQRCode(tableNumber);
-  };
-
-  const getPublicMenu = (restaurantSlug?: string) => {
-    // O slug pode ser usado futuramente para buscar cardápio de restaurantes específicos
-    console.log('Loading menu for:', restaurantSlug);
+  const addCategory = async (categoryData: Partial<MenuCategory>) => {
+    if (!restaurantId) return;
     
-    const now = new Date();
-    const currentTime = now.toTimeString().slice(0, 5);
-    const currentDay = now
-      .toLocaleDateString('en-US', { weekday: 'long' })
-      .toLowerCase();
+    const response = await categoriesApi.create(categoryData, restaurantId);
+    if (response.data) {
+      await refreshCategories();
+    } else {
+      throw new Error(response.error || 'Erro ao criar categoria');
+    }
+  };
 
-    const availableCategories = categories.filter((category) => {
-      if (!category.isActive) return false;
+  const updateCategory = async (id: string, categoryData: Partial<MenuCategory>) => {
+    if (!restaurantId) return;
+    
+    const response = await categoriesApi.update(id, categoryData, restaurantId);
+    if (response.data) {
+      await refreshCategories();
+    } else {
+      throw new Error(response.error || 'Erro ao atualizar categoria');
+    }
+  };
 
-      if (category.schedule) {
-        const { startTime, endTime, days } = category.schedule;
-        if (!days.includes(currentDay)) return false;
-        if (currentTime < startTime || currentTime > endTime) return false;
-      }
+  const deleteCategory = async (id: string) => {
+    if (!restaurantId) return;
+    
+    const response = await categoriesApi.delete(id, restaurantId);
+    if (response.status === 200 || response.status === 204) {
+      await refreshCategories();
+    } else {
+      throw new Error(response.error || 'Erro ao deletar categoria');
+    }
+  };
 
-      return true;
-    });
+  const reorderCategories = async (categoryIds: string[]) => {
+    if (!restaurantId) return;
+    
+    const response = await categoriesApi.reorder(categoryIds, restaurantId);
+    if (response.data || response.status === 200) {
+      await refreshCategories();
+    } else {
+      throw new Error(response.error || 'Erro ao reordenar categorias');
+    }
+  };
 
-    const availableProducts = products.filter((product) => {
-      if (!product.isActive || !product.isAvailable) return false;
+  // ==================== PRODUCT ACTIONS ====================
 
-      if (product.schedule) {
-        const { startTime, endTime, days } = product.schedule;
-        if (!days.includes(currentDay)) return false;
-        if (currentTime < startTime || currentTime > endTime) return false;
-      }
+  const addProduct = async (productData: Partial<MenuProduct>) => {
+    if (!restaurantId) return;
+    
+    const response = await productsApi.create(productData, restaurantId);
+    if (response.data) {
+      await refreshProducts();
+    } else {
+      throw new Error(response.error || 'Erro ao criar produto');
+    }
+  };
 
-      return availableCategories.some((cat) => cat.id === product.categoryId);
-    });
+  const updateProduct = async (id: string, productData: Partial<MenuProduct>) => {
+    if (!restaurantId) return;
+    
+    const response = await productsApi.update(id, productData, restaurantId);
+    if (response.data) {
+      await refreshProducts();
+    } else {
+      throw new Error(response.error || 'Erro ao atualizar produto');
+    }
+  };
 
+  const deleteProduct = async (id: string) => {
+    if (!restaurantId) return;
+    
+    const response = await productsApi.delete(id, restaurantId);
+    if (response.status === 200 || response.status === 204) {
+      await refreshProducts();
+    } else {
+      throw new Error(response.error || 'Erro ao deletar produto');
+    }
+  };
+
+  const toggleProductAvailability = async (id: string) => {
+    if (!restaurantId) return;
+    
+    const response = await productsApi.toggle(id, restaurantId);
+    if (response.data || response.status === 200) {
+      await refreshProducts();
+    } else {
+      throw new Error(response.error || 'Erro ao alterar disponibilidade');
+    }
+  };
+
+  const reorderProducts = async (categoryId: string, productIds: string[]) => {
+    if (!restaurantId) return;
+    
+    const response = await productsApi.reorder(categoryId, productIds, restaurantId);
+    if (response.data || response.status === 200) {
+      await refreshProducts();
+    } else {
+      throw new Error(response.error || 'Erro ao reordenar produtos');
+    }
+  };
+
+  // ==================== TABLE ACTIONS ====================
+
+  const addTable = async (tableData: Partial<Table>) => {
+    if (!restaurantId) return;
+    
+    const response = await tablesApi.create(tableData, restaurantId);
+    if (response.data) {
+      await refreshTables();
+    } else {
+      throw new Error(response.error || 'Erro ao criar mesa');
+    }
+  };
+
+  const updateTable = async (id: string, tableData: Partial<Table>) => {
+    if (!restaurantId) return;
+    
+    const response = await tablesApi.update(id, tableData, restaurantId);
+    if (response.data) {
+      await refreshTables();
+    } else {
+      throw new Error(response.error || 'Erro ao atualizar mesa');
+    }
+  };
+
+  const deleteTable = async (id: string) => {
+    if (!restaurantId) return;
+    
+    const response = await tablesApi.delete(id, restaurantId);
+    if (response.status === 200 || response.status === 204) {
+      await refreshTables();
+    } else {
+      throw new Error(response.error || 'Erro ao deletar mesa');
+    }
+  };
+
+  const updateTableStatus = async (id: string, status: string) => {
+    if (!restaurantId) return;
+    
+    const response = await tablesApi.updateStatus(id, status, restaurantId);
+    if (response.data || response.status === 200) {
+      await refreshTables();
+    } else {
+      throw new Error(response.error || 'Erro ao atualizar status da mesa');
+    }
+  };
+
+  const generateTableQR = async (tableId: string): Promise<string> => {
+    if (!restaurantId) return '';
+    
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const response = await tablesApi.generateQRCode(tableId, baseUrl, restaurantId);
+    
+    if (response.data) {
+      await refreshTables();
+      return response.data.qrCode || response.data.url || '';
+    } else {
+      throw new Error(response.error || 'Erro ao gerar QR Code');
+    }
+  };
+
+  // ==================== HELPERS ====================
+
+  const getPublicMenu = () => {
     return {
-      categories: availableCategories,
-      products: availableProducts,
+      categories: categories.filter(c => c.isActive).sort((a, b) => a.order - b.order),
+      products: products.filter(p => p.isActive && p.isAvailable).sort((a, b) => a.order - b.order)
     };
   };
 
-  const getAvailableProducts = (): MenuProduct[] => {
-    return products.filter((product) => product.isActive && product.isAvailable);
+  const getAvailableProducts = () => {
+    return products.filter(p => p.isActive && p.isAvailable);
   };
+
+  // ==================== CONTEXT VALUE ====================
 
   return (
     <MenuContext.Provider
       value={{
+        // State
         categories,
         products,
         tables,
+        isLoading,
+        
+        // Category Actions
         addCategory,
         updateCategory,
         deleteCategory,
+        reorderCategories,
+        
+        // Product Actions
         addProduct,
         updateProduct,
         deleteProduct,
+        toggleProductAvailability,
         reorderProducts,
+        
+        // Table Actions
+        addTable,
+        updateTable,
+        deleteTable,
+        updateTableStatus,
         generateTableQR,
+        
+        // Helpers
         getPublicMenu,
         getAvailableProducts,
+        
+        // Refresh
+        refreshCategories,
+        refreshProducts,
+        refreshTables,
+        refreshAll,
       }}
     >
       {children}

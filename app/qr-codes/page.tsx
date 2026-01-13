@@ -135,8 +135,8 @@ export default function QRCodesPage() {
     }
   };
 
-  // Mock tables for demo
-  const mockTables = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+  // Get active tables from context
+  const activeTables = tables.filter(t => t.isActive).map(t => t.number);
 
   return (
     <Layout>
@@ -227,7 +227,7 @@ export default function QRCodesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total de Mesas</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{mockTables.length}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-2">{tables.length}</p>
               </div>
               <div className="p-3 rounded-lg bg-blue-50">
                 <QrCode className="w-6 h-6 text-blue-600" />
@@ -238,7 +238,7 @@ export default function QRCodesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Mesas Ativas</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{mockTables.length}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-2">{activeTables.length}</p>
               </div>
               <div className="p-3 rounded-lg bg-green-50">
                 <Eye className="w-6 h-6 text-green-600" />
@@ -249,7 +249,7 @@ export default function QRCodesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">QR Codes Gerados</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{mockTables.length}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-2">{activeTables.length}</p>
               </div>
               <div className="p-3 rounded-lg bg-purple-50">
                 <Download className="w-6 h-6 text-purple-600" />
@@ -264,7 +264,7 @@ export default function QRCodesPage() {
             <h3 className="text-lg font-semibold text-gray-900">QR Codes das Mesas</h3>
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mockTables.map((tableNumber) => (
+            {activeTables.map((tableNumber) => (
               <div key={tableNumber} className="border border-gray-100 rounded-lg p-6 text-center hover:shadow-md transition-shadow">
                 <div className="mb-4">
                   <h4 className="text-lg font-semibold text-gray-900 mb-2">Mesa {tableNumber}</h4>

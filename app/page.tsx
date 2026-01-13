@@ -1,31 +1,26 @@
 'use client';
 
-import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function RootPage() {
-  const { user, isLoading } = useAuth();
   const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
-      if (user?.currentRestaurant?.id) {
-        // Usuário autenticado, redirecionar para dashboard
-        router.push(`/dashboard/${user.currentRestaurant.id}`);
+      if (isAuthenticated) {
+        router.replace('/menu');
       } else {
-        // Usuário não autenticado, redirecionar para login
-        router.push('/login');
+        router.replace('/login');
       }
     }
-  }, [user, isLoading, router]);
+  }, [isAuthenticated, isLoading, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-gray-600">Carregando...</p>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
     </div>
   );
 }

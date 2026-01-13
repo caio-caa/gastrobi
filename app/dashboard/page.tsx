@@ -1,289 +1,285 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   DollarSign,
   Users,
   ShoppingBag,
   TrendingUp,
+  ChefHat,
+  Clock,
   Star,
-  Calendar,
-  MessageSquare,
+  ArrowUpRight,
+  ArrowDownRight,
+  RefreshCw,
+  Package
 } from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-} from 'recharts';
-import { useData } from '@/contexts/DataContext';
-import MetricCard from '@/components/ui/MetricCard';
-import Layout from '@/components/Layout/Layout';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useAuth } from '@/contexts/AuthContext';
+import { useData } from '@/contexts/DataContext';
+import Layout from '@/components/Layout/Layout';
+import Button from '@/components/ui/Button';
 
 export default function DashboardPage() {
-  const { dashboardData, customers, campaigns } = useData();
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const { customers, products, dashboardData } = useData();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL',
+      currency: 'BRL'
     }).format(value);
   };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    // TODO: Recarregar dados da API
+    setTimeout(() => setIsRefreshing(false), 1000);
+  };
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  const revenueChange = dashboardData?.revenue?.previousPeriodChange || 0;
+  const ordersChange = dashboardData?.orders?.previousPeriodChange || 0;
+  const customersChange = dashboardData?.customers?.previousPeriodChange || 0;
+  const ticketChange = dashboardData?.averageTicket?.previousPeriodChange || 0;
+
+  const metrics = [
+    {
+      title: 'Faturamento Hoje',
+      value: formatCurrency(dashboardData?.revenue?.daily || 0),
+      change: `${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}%`,
+      isPositive: revenueChange >= 0,
+      icon: DollarSign,
+      color: 'bg-green-50 text-green-600'
+    },
+    {
+      title: 'Pedidos Hoje',
+      value: dashboardData?.orders?.today?.toString() || '0',
+      change: `${ordersChange >= 0 ? '+' : ''}${ordersChange.toFixed(1)}%`,
+      isPositive: ordersChange >= 0,
+      icon: ShoppingBag,
+      color: 'bg-blue-50 text-blue-600'
+    },
+    {
+      title: 'Clientes Ativos',
+      value: dashboardData?.customers?.active?.toString() || customers.filter(c => c.status === 'active').length.toString(),
+      change: `${customersChange >= 0 ? '+' : ''}${customersChange.toFixed(1)}%`,
+      isPositive: customersChange >= 0,
+      icon: Users,
+      color: 'bg-purple-50 text-purple-600'
+    },
+    {
+      title: 'Ticket Médio',
+      value: formatCurrency(dashboardData?.averageTicket?.value || 0),
+      change: `${ticketChange >= 0 ? '+' : ''}${ticketChange.toFixed(1)}%`,
+      isPositive: ticketChange >= 0,
+      icon: TrendingUp,
+      color: 'bg-orange-50 text-orange-600'
+    }
+  ];
+
+  const quickActions = [
+    { label: 'Novo Pedido', href: '/pos', icon: ShoppingBag, color: 'bg-blue-600' },
+    { label: 'Cardápio', href: '/menu', icon: Package, color: 'bg-green-600' },
+    { label: 'Cozinha', href: '/pos', icon: ChefHat, color: 'bg-red-600' },
+    { label: 'Clientes', href: '/customers', icon: Users, color: 'bg-purple-600' }
+  ];
 
   return (
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Dashboard
-          </h1>
-          <p className="text-gray-600">
-            Visão geral do seu restaurante
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Olá, {user?.fullName?.split(' ')[0] || 'Usuário'}! 👋
+            </h1>
+            <p className="text-gray-600">
+              {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+            </p>
+          </div>
+          <Button
+            icon={RefreshCw}
+            variant="outline"
+            onClick={handleRefresh}
+            className={isRefreshing ? 'animate-spin' : ''}
+          >
+            Atualizar
+          </Button>
         </div>
 
         {/* Métricas Principais */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard
-            title="Faturamento Total"
-            value={formatCurrency(dashboardData.totalRevenue)}
-            change="+12.5% vs mês anterior"
-            changePositive={true}
-            icon={DollarSign}
-            iconColor="text-green-600"
-          />
-          <MetricCard
-            title="Faturamento Hoje"
-            value={formatCurrency(dashboardData.dailyRevenue)}
-            change="+8.2% vs ontem"
-            changePositive={true}
-            icon={TrendingUp}
-            iconColor="text-blue-600"
-          />
-          <MetricCard
-            title="Ticket Médio"
-            value={formatCurrency(dashboardData.avgTicket)}
-            change="+5.1% vs mês anterior"
-            changePositive={true}
-            icon={ShoppingBag}
-            iconColor="text-purple-600"
-          />
-          <MetricCard
-            title="Clientes Ativos"
-            value={`${dashboardData.activeCustomers}/${dashboardData.totalCustomers}`}
-            change="2 novos hoje"
-            changePositive={true}
-            icon={Users}
-            iconColor="text-orange-600"
-          />
-        </div>
-
-        {/* Gráficos */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Faturamento Mensal */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Faturamento Mensal
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={dashboardData.monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip
-                  formatter={(value) => [
-                    formatCurrency(Number(value)),
-                    'Faturamento',
-                  ]}
-                  labelStyle={{ color: '#374151' }}
-                />
-                <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Evolução de Clientes */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Evolução de Clientes
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={dashboardData.monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip
-                  formatter={(value) => [value, 'Clientes']}
-                  labelStyle={{ color: '#374151' }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="customers"
-                  stroke="#10b981"
-                  strokeWidth={3}
-                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Seções Adicionais */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Produtos Mais Vendidos */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Produtos Mais Vendidos
-            </h3>
-            <div className="space-y-3">
-              {dashboardData.topProducts.map(
-                (
-                  product: {
-                    id: string;
-                    name: string;
-                    category: string;
-                    price: number;
-                    popularity: number;
-                  },
-                  index: number
-                ) => (
-                  <div
-                    key={product.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-medium text-white">
-                          {index + 1}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {product.name}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {product.category}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-gray-900">
-                        {formatCurrency(product.price)}
-                      </p>
-                      <div className="flex items-center space-x-1">
-                        <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                        <span className="text-xs text-gray-500">
-                          {product.popularity}%
-                        </span>
-                      </div>
+          {metrics.map((metric, index) => {
+            const Icon = metric.icon;
+            return (
+              <div
+                key={index}
+                className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">{metric.title}</p>
+                    <p className="text-2xl font-bold text-gray-900 mt-2">{metric.value}</p>
+                    <div className="flex items-center mt-2">
+                      {metric.isPositive ? (
+                        <ArrowUpRight className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <ArrowDownRight className="w-4 h-4 text-red-500" />
+                      )}
+                      <span className={`text-sm ${metric.isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                        {metric.change} vs ontem
+                      </span>
                     </div>
                   </div>
-                )
-              )}
-            </div>
-          </div>
+                  <div className={`p-3 rounded-lg ${metric.color}`}>
+                    <Icon className="w-6 h-6" />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-          {/* Clientes Recentes */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Clientes Recentes
-            </h3>
-            <div className="space-y-3">
-              {customers.slice(0, 5).map((customer) => (
-                <div
-                  key={customer.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+        {/* Ações Rápidas */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Ações Rápidas</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {quickActions.map((action, index) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={index}
+                  onClick={() => router.push(action.href)}
+                  className="flex flex-col items-center p-4 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors"
                 >
+                  <div className={`${action.color} p-3 rounded-lg mb-2`}>
+                    <Icon className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">{action.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Grid de Informações */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Pedidos Recentes */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Pedidos Recentes</h2>
+              <button
+                onClick={() => router.push('/pos')}
+                className="text-blue-600 text-sm font-medium hover:text-blue-700"
+              >
+                Ver todos →
+              </button>
+            </div>
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-white">
-                        {customer.name.charAt(0).toUpperCase()}
-                      </span>
+                    <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                      <ShoppingBag className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">
-                        {customer.name}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {format(customer.lastVisit, 'dd/MM/yyyy', {
-                          locale: ptBR,
-                        })}
-                      </p>
+                      <p className="font-medium text-gray-900">Pedido #{1000 + i}</p>
+                      <p className="text-sm text-gray-500">Mesa {i} • há {i * 5} min</p>
                     </div>
                   </div>
-                  <div
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      customer.level === 'gold'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : customer.level === 'silver'
-                        ? 'bg-gray-100 text-gray-800'
-                        : 'bg-orange-100 text-orange-800'
-                    }`}
-                  >
-                    {customer.level}
+                  <div className="text-right">
+                    <p className="font-semibold text-gray-900">{formatCurrency(50 + i * 15)}</p>
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      i <= 2 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+                    }`}>
+                      {i <= 2 ? 'Preparando' : 'Pronto'}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Últimas Campanhas */}
+          {/* Produtos Mais Vendidos */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Últimas Campanhas
-            </h3>
-            <div className="space-y-3">
-              {campaigns.slice(0, 5).map((campaign) => (
-                <div
-                  key={campaign.id}
-                  className="p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium text-gray-900">
-                      {campaign.name}
-                    </h4>
-                    <div
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        campaign.status === 'sent'
-                          ? 'bg-green-100 text-green-800'
-                          : campaign.status === 'scheduled'
-                          ? 'bg-blue-100 text-blue-800'
-                          : campaign.status === 'active'
-                          ? 'bg-purple-100 text-purple-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {campaign.status === 'sent'
-                        ? 'Enviada'
-                        : campaign.status === 'scheduled'
-                        ? 'Agendada'
-                        : campaign.status === 'active'
-                        ? 'Ativa'
-                        : 'Rascunho'}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Produtos Populares</h2>
+              <button
+                onClick={() => router.push('/menu')}
+                className="text-blue-600 text-sm font-medium hover:text-blue-700"
+              >
+                Ver cardápio →
+              </button>
+            </div>
+            <div className="space-y-4">
+              {(products.slice(0, 5) || []).map((product, index) => (
+                <div key={product.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden">
+                      {product.image ? (
+                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className="w-5 h-5 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{product.name}</p>
+                      <p className="text-sm text-gray-500">{product.category}</p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
-                    <div className="flex items-center space-x-1">
-                      <MessageSquare className="w-4 h-4" />
-                      <span>{campaign.type}</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>
-                        {format(campaign.createdAt, 'dd/MM', { locale: ptBR })}
-                      </span>
+                  <div className="text-right">
+                    <p className="font-semibold text-gray-900">{formatCurrency(product.price)}</p>
+                    <div className="flex items-center justify-end space-x-1">
+                      <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                      <span className="text-xs text-gray-500">{product.popularity || 0} vendas</span>
                     </div>
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Status do Sistema */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-xl text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Sistema Operacional</h3>
+              <p className="text-blue-100 mt-1">
+                Todos os serviços estão funcionando normalmente
+              </p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-sm">Online</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Clock className="w-4 h-4" />
+                <span className="text-sm">{format(new Date(), 'HH:mm')}</span>
+              </div>
             </div>
           </div>
         </div>

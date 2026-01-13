@@ -12,12 +12,13 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { useData } from '@/contexts/DataContext';
+import { useMenu } from '@/contexts/MenuContext';
 import Layout from '@/components/Layout/Layout';
 import Button from '@/components/ui/Button';
-import { format, subDays } from 'date-fns';
 
 export default function ReportsPage() {
-  const { products, customers } = useData();
+  const { customers, dashboardData, monthlyData, topProducts, recentOrders } = useData();
+  const { products } = useMenu();
   const [dateRange, setDateRange] = useState('30');
   const [reportType, setReportType] = useState('revenue');
 
@@ -28,42 +29,48 @@ export default function ReportsPage() {
     }).format(value);
   };
 
+  // Calculate category data from products
   const categoryData = products.reduce((acc: any[], product) => {
     const existing = acc.find(item => item.category === product.category);
     if (existing) {
       existing.count += 1;
-      existing.revenue += product.price * product.popularity / 10;
+      existing.revenue += product.price;
     } else {
       acc.push({
-        category: product.category,
+        category: product.category || 'Outros',
         count: 1,
-        revenue: product.price * product.popularity / 10
+        revenue: product.price
       });
     }
     return acc;
   }, []);
 
+  // Customer level data from API
   const levelData = [
     { level: 'Bronze', count: customers.filter(c => c.level === 'bronze').length, color: '#f97316' },
     { level: 'Silver', count: customers.filter(c => c.level === 'silver').length, color: '#6b7280' },
-    { level: 'Gold', count: customers.filter(c => c.level === 'gold').length, color: '#eab308' }
-  ];
+    { level: 'Gold', count: customers.filter(c => c.level === 'gold').length, color: '#eab308' },
+    { level: 'Platinum', count: customers.filter(c => c.level === 'platinum').length, color: '#7c3aed' }
+  ].filter(item => item.count > 0);
 
-  const getRevenueData = (days: number) => {
-    const data = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const date = subDays(new Date(), i);
-      data.push({
-        date: format(date, 'dd/MM'),
-        revenue: Math.floor(Math.random() * 1000) + 500,
-        orders: Math.floor(Math.random() * 20) + 10,
-        customers: Math.floor(Math.random() * 15) + 5
-      });
-    }
-    return data;
-  };
+  // Use monthlyData from API for charts
+  const chartData = monthlyData.map(item => ({
+    date: item.month,
+    revenue: item.revenue,
+    orders: item.orders,
+    customers: item.customers
+  }));
 
-  const revenueData = getRevenueData(Number(dateRange));
+  // Get totals from dashboardData or calculate from monthlyData
+  const totalRevenue = dashboardData?.revenue?.total || monthlyData.reduce((sum, item) => sum + item.revenue, 0);
+  const totalOrders = dashboardData?.orders?.total || monthlyData.reduce((sum, item) => sum + item.orders, 0);
+  const totalCustomers = dashboardData?.customers?.total || customers.length;
+  const avgTicket = dashboardData?.averageTicket?.value || (totalOrders > 0 ? totalRevenue / totalOrders : 0);
+
+  const revenueChange = dashboardData?.revenue?.previousPeriodChange || 0;
+  const ordersChange = dashboardData?.orders?.previousPeriodChange || 0;
+  const customersChange = dashboardData?.customers?.previousPeriodChange || 0;
+  const ticketChange = dashboardData?.averageTicket?.previousPeriodChange || 0;
 
   const handleExport = () => {
     alert('Relatório exportado com sucesso!');
@@ -122,9 +129,11 @@ export default function ReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Faturamento Total</p>
                 <p className="text-2xl font-bold text-gray-900 mt-2">
-                  {formatCurrency(revenueData.reduce((sum, item) => sum + item.revenue, 0))}
+                  {formatCurrency(totalRevenue)}
                 </p>
-                <p className="text-sm text-green-600 mt-1">+12.5% vs período anterior</p>
+                <p className={`text-sm mt-1 ${revenueChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(1)}% vs período anterior
+                </p>
               </div>
               <div className="p-3 rounded-lg bg-green-50">
                 <DollarSign className="w-6 h-6 text-green-600" />
@@ -137,9 +146,11 @@ export default function ReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total de Pedidos</p>
                 <p className="text-2xl font-bold text-gray-900 mt-2">
-                  {revenueData.reduce((sum, item) => sum + item.orders, 0)}
+                  {totalOrders}
                 </p>
-                <p className="text-sm text-blue-600 mt-1">+8.3% vs período anterior</p>
+                <p className={`text-sm mt-1 ${ordersChange >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                  {ordersChange >= 0 ? '+' : ''}{ordersChange.toFixed(1)}% vs período anterior
+                </p>
               </div>
               <div className="p-3 rounded-lg bg-blue-50">
                 <ShoppingBag className="w-6 h-6 text-blue-600" />
@@ -152,9 +163,11 @@ export default function ReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Clientes Únicos</p>
                 <p className="text-2xl font-bold text-gray-900 mt-2">
-                  {revenueData.reduce((sum, item) => sum + item.customers, 0)}
+                  {totalCustomers}
                 </p>
-                <p className="text-sm text-purple-600 mt-1">+15.2% vs período anterior</p>
+                <p className={`text-sm mt-1 ${customersChange >= 0 ? 'text-purple-600' : 'text-red-600'}`}>
+                  {customersChange >= 0 ? '+' : ''}{customersChange.toFixed(1)}% vs período anterior
+                </p>
               </div>
               <div className="p-3 rounded-lg bg-purple-50">
                 <Users className="w-6 h-6 text-purple-600" />
@@ -167,12 +180,11 @@ export default function ReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Ticket Médio</p>
                 <p className="text-2xl font-bold text-gray-900 mt-2">
-                  {formatCurrency(
-                    revenueData.reduce((sum, item) => sum + item.revenue, 0) /
-                    revenueData.reduce((sum, item) => sum + item.orders, 0)
-                  )}
+                  {formatCurrency(avgTicket)}
                 </p>
-                <p className="text-sm text-orange-600 mt-1">+3.7% vs período anterior</p>
+                <p className={`text-sm mt-1 ${ticketChange >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
+                  {ticketChange >= 0 ? '+' : ''}{ticketChange.toFixed(1)}% vs período anterior
+                </p>
               </div>
               <div className="p-3 rounded-lg bg-orange-50">
                 <TrendingUp className="w-6 h-6 text-orange-600" />
@@ -185,10 +197,10 @@ export default function ReportsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Faturamento - Últimos {dateRange} dias
+              Faturamento Mensal
             </h3>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={revenueData}>
+              <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="date" stroke="#6b7280" />
                 <YAxis stroke="#6b7280" />
@@ -266,10 +278,7 @@ export default function ReportsPage() {
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Produtos Mais Vendidos</h3>
             <div className="space-y-4">
-              {products
-                .sort((a, b) => b.popularity - a.popularity)
-                .slice(0, 5)
-                .map((product, index) => (
+              {topProducts.length > 0 ? topProducts.slice(0, 5).map((product, index) => (
                   <div key={product.id} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
@@ -281,19 +290,13 @@ export default function ReportsPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium text-gray-900">{formatCurrency(product.price)}</p>
-                      <div className="flex items-center space-x-1">
-                        <div className="w-16 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full" 
-                            style={{ width: `${product.popularity}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-xs text-gray-500">{product.popularity}%</span>
-                      </div>
+                      <p className="font-medium text-gray-900">{formatCurrency(product.revenue)}</p>
+                      <p className="text-xs text-gray-500">{product.salesCount} vendas</p>
                     </div>
                   </div>
-                ))}
+                )) : (
+                <p className="text-gray-500 text-center py-4">Nenhum produto vendido ainda</p>
+              )}
             </div>
           </div>
         </div>
@@ -323,43 +326,50 @@ export default function ReportsPage() {
                     Lucro
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Popularidade
+                    Status
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {products.map((product) => (
-                  <tr key={product.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {product.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.category}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(product.price)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(product.cost)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <span className={product.profit > 0 ? 'text-green-600' : 'text-red-600'}>
-                        {formatCurrency(product.profit)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
-                        <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full" 
-                            style={{ width: `${product.popularity}%` }}
-                          ></div>
-                        </div>
-                        <span>{product.popularity}%</span>
-                      </div>
+                {products.length > 0 ? products.map((product) => {
+                  const profit = product.price - product.cost;
+                  return (
+                    <tr key={product.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {product.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {product.category}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatCurrency(product.price)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatCurrency(product.cost)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className={profit > 0 ? 'text-green-600' : 'text-red-600'}>
+                          {formatCurrency(profit)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          product.isActive && product.isAvailable
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {product.isActive && product.isAvailable ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                }) : (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                      Nenhum produto cadastrado
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

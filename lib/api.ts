@@ -438,6 +438,97 @@ export const uploadsApi = {
   },
 };
 
+// ==================== DASHBOARD ====================
+
+export const dashboardApi = {
+  metrics: async (restaurantId: string, period: 'today' | 'week' | 'month' | 'year' = 'today') =>
+    fetchWithAuth<any>(`/dashboard/metrics?period=${period}`, {}, restaurantId),
+
+  monthly: async (restaurantId: string, year?: number, months: number = 6) => {
+    const params = new URLSearchParams({ months: months.toString() });
+    if (year) params.append('year', year.toString());
+    return fetchWithAuth<any>(`/dashboard/monthly?${params}`, {}, restaurantId);
+  },
+
+  topProducts: async (restaurantId: string, limit: number = 10, period: 'week' | 'month' | 'year' = 'month') =>
+    fetchWithAuth<any>(`/dashboard/top-products?limit=${limit}&period=${period}`, {}, restaurantId),
+
+  recentOrders: async (restaurantId: string, limit: number = 10) =>
+    fetchWithAuth<any>(`/dashboard/recent-orders?limit=${limit}`, {}, restaurantId),
+};
+
+// ==================== SETTINGS ====================
+
+export const settingsApi = {
+  get: async (restaurantId: string) =>
+    fetchWithAuth<any>('/settings', {}, restaurantId),
+
+  updateRestaurant: async (data: any, restaurantId: string) =>
+    fetchWithAuth<any>('/settings/restaurant', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, restaurantId),
+
+  updateOpeningHours: async (data: any, restaurantId: string) =>
+    fetchWithAuth<any>('/settings/opening-hours', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, restaurantId),
+
+  updateSocialMedia: async (data: any, restaurantId: string) =>
+    fetchWithAuth<any>('/settings/social-media', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, restaurantId),
+
+  updateLoyalty: async (data: any, restaurantId: string) =>
+    fetchWithAuth<any>('/settings/loyalty', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, restaurantId),
+
+  updateNotifications: async (data: any, restaurantId: string) =>
+    fetchWithAuth<any>('/settings/notifications', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, restaurantId),
+};
+
+// ==================== ALERTS ====================
+
+export const alertsApi = {
+  list: async (restaurantId: string, params?: { isRead?: boolean; type?: string; limit?: number }) => {
+    const query = new URLSearchParams(params as any).toString();
+    return fetchWithAuth<any>(`/alerts${query ? '?' + query : ''}`, {}, restaurantId);
+  },
+
+  markAsRead: async (id: string, restaurantId: string) =>
+    fetchWithAuth<any>(`/alerts/${id}/read`, {
+      method: 'PATCH',
+    }, restaurantId),
+
+  markAllAsRead: async (restaurantId: string) =>
+    fetchWithAuth<any>('/alerts/read-all', {
+      method: 'POST',
+    }, restaurantId),
+};
+
+// ==================== REPORTS ====================
+
+export const reportsApi = {
+  salesByCategory: async (restaurantId: string, startDate: string, endDate: string) =>
+    fetchWithAuth<any>(`/reports/sales-by-category?startDate=${startDate}&endDate=${endDate}`, {}, restaurantId),
+
+  customersByLevel: async (restaurantId: string) =>
+    fetchWithAuth<any>('/reports/customers-by-level', {}, restaurantId),
+
+  export: async (data: { type: string; format: string; startDate: string; endDate: string }, restaurantId: string) =>
+    fetchWithAuth<any>('/reports/export', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, restaurantId),
+};
+
 // ==================== HEALTH ====================
 
 export const healthApi = {
@@ -471,6 +562,10 @@ const api = {
   loyalty: loyaltyApi,
   campaigns: campaignsApi,
   uploads: uploadsApi,
+  dashboard: dashboardApi,
+  settings: settingsApi,
+  alerts: alertsApi,
+  reports: reportsApi,
   health: healthApi,
   setTokens,
   getTokens,
