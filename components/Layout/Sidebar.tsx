@@ -28,8 +28,8 @@ interface SidebarProps {
 const restauranteNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Clientes', href: '/customers', icon: Users },
-  { name: 'Fidelidade', href: '/loyalty', icon: Gift },
-  { name: 'Campanhas', href: '/campaigns', icon: Megaphone },
+  { name: 'Fidelidade', href: '/loyalty', icon: Gift, comingSoon: true },
+  { name: 'Campanhas', href: '/campaigns', icon: Megaphone, comingSoon: true },
   { name: 'Cardápio Digital', href: '/menu', icon: MenuIcon },
   { name: 'QR Codes', href: '/qr-codes', icon: QrCode },
   { name: 'POS - Frente de Caixa', href: '/pos', icon: Calculator },
@@ -75,7 +75,36 @@ function Sidebar({ open, setOpen }: SidebarProps) {
         <nav className="mt-6 px-3">
           {/* Navegação do Restaurante - Owner/Manager */}
           {restauranteNavigation.map((item) => {
-            const active = isActive(item.href);
+            const active = isActive(item.href) && !item.comingSoon;
+            // Render "coming soon" items as non-clickable with a "Brevemente" badge
+            if (item.comingSoon) {
+              return (
+                <div
+                  key={item.name}
+                  className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg mb-1 transition-colors duration-200 ${
+                    active ? 'text-white' : 'text-gray-400 cursor-not-allowed'
+                  }`}
+                  style={
+                    active
+                      ? {
+                          backgroundColor: config.primaryColor,
+                        }
+                      : {}
+                  }
+                  aria-disabled="true"
+                  title="Disponível em breve"
+                >
+                  <item.icon className="mr-3 h-5 w-5 flex-shrink-0" />
+                  <span className="flex items-center gap-2">
+                    {item.name}
+                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-gray-200 text-xs font-semibold text-gray-700">
+                      Brevemente
+                    </span>
+                  </span>
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={item.name}
