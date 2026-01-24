@@ -63,7 +63,7 @@ export default function HomePage() {
 
   const filteredRestaurants = restaurants.filter(r =>
     r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.cuisine.toLowerCase().includes(searchTerm.toLowerCase())
+    (r.cuisine && r.cuisine.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleRestaurantClick = (slug: string) => {
