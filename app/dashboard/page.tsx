@@ -8,7 +8,6 @@ import {
   ShoppingBag,
   TrendingUp,
   ChefHat,
-  Clock,
   Star,
   ArrowUpRight,
   ArrowDownRight,
@@ -258,28 +257,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Status do Sistema */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-xl text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">Sistema Operacional</h3>
-              <p className="text-blue-100 mt-1">
-                Todos os serviços estão funcionando normalmente
-              </p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-sm">Online</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4" />
-                <span className="text-sm">{format(new Date(), 'HH:mm')}</span>
-              </div>
             </div>
           </div>
         </div>
