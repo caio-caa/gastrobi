@@ -4,23 +4,14 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard,
   Users,
-  Gift,
-  Megaphone,
   BarChart3,
-  Settings,
   X,
-  Menu as MenuIcon,
-  QrCode,
-  Calculator,
   Palette,
   Building2,
   CreditCard,
   FileText,
-  Shield,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
 import { useWhiteLabel } from '@/contexts/WhiteLabelContext';
 import WhiteLabelHeader from '@/components/WhiteLabel/WhiteLabelHeader';
 
@@ -33,14 +24,13 @@ interface SidebarProps {
 const adminSaaSNavigation = [
   { name: 'Gestão de Usuários', href: '/admin/users', icon: Users },
   { name: 'Restaurantes', href: '/admin/restaurants', icon: Building2 },
-  { name: 'White Label', href: '/admin/white-label', icon: Palette },
+  { name: 'White Label', href: '/admin/white-label', icon: Palette, comingSoon: true },
   { name: 'Faturamento', href: '/admin/billing', icon: CreditCard },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { name: 'Logs de Auditoria', href: '/admin/audit', icon: FileText },
 ];
 
 function Sidebar({ open, setOpen }: SidebarProps) {
-  const { user } = useAuth();
   const { config } = useWhiteLabel();
   const pathname = usePathname();
 
@@ -77,7 +67,36 @@ function Sidebar({ open, setOpen }: SidebarProps) {
         <nav className="mt-6 px-3">
           {/* Admin SaaS Navigation */}
           {adminSaaSNavigation.map((item) => {
-            const active = isActive(item.href);
+            const active = isActive(item.href) && !item.comingSoon;
+            // Render "coming soon" items as non-clickable with a "Brevemente" badge
+            if (item.comingSoon) {
+              return (
+                <div
+                  key={item.name}
+                  className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg mb-1 transition-colors duration-200 ${
+                    active ? 'text-white' : 'text-gray-400 cursor-not-allowed'
+                  }`}
+                  style={
+                    active
+                      ? {
+                          backgroundColor: config.primaryColor,
+                        }
+                      : {}
+                  }
+                  aria-disabled="true"
+                  title="Disponível em breve"
+                >
+                  <item.icon className="mr-3 h-5 w-5 shrink-0" />
+                  <span className="flex items-center gap-2">
+                    {item.name}
+                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-gray-200 text-xs font-semibold text-gray-700">
+                      Brevemente
+                    </span>
+                  </span>
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={item.name}
@@ -96,7 +115,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                 }
                 onClick={() => setOpen(false)}
               >
-                <item.icon className="mr-3 h-5 w-5 flex-shrink-0" />
+                <item.icon className="mr-3 h-5 w-5 shrink-0" />
                 {item.name}
               </Link>
             );

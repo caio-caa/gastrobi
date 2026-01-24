@@ -23,7 +23,10 @@ import {
   LogIn,
   LogOut,
   RefreshCw,
-  Database
+  Database,
+  ChevronRight,
+  ChevronDown,
+  ChevronLeft
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Layout from '@/components/Layout/Layout';
@@ -55,6 +58,7 @@ interface AuditStats {
 
 export default function AdminAuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [totalLogs, setTotalLogs] = useState(0);
   const [stats, setStats] = useState<AuditStats>({
     totalLogs: 0,
     logsByAction: {},
@@ -67,22 +71,31 @@ export default function AdminAuditPage() {
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [entityFilter, setEntityFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentPage, itemsPerPage, searchTerm, actionFilter, entityFilter, dateFilter]);
 
   const loadData = async () => {
     setLoading(true);
     try {
+      const skip = (currentPage - 1) * itemsPerPage;
       const [logsResponse, statsResponse] = await Promise.all([
-        auditApi.list({ take: 100 }),
+        auditApi.list({ 
+          skip,
+          take: itemsPerPage,
+          action: actionFilter !== 'all' ? actionFilter : undefined,
+          entity: entityFilter !== 'all' ? entityFilter : undefined
+        }),
         auditApi.stats()
       ]);
 
       if (logsResponse.data && Array.isArray(logsResponse.data.data)) {
         setLogs(logsResponse.data.data);
+        setTotalLogs(logsResponse.data.total || 0);
       }
 
       if (statsResponse.data) {
@@ -95,28 +108,36 @@ export default function AdminAuditPage() {
     }
   };
 
-  const filteredLogs = logs.filter(log => {
-    const matchesSearch = (log.userEmail || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (log.userEmail || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (log.entity || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesAction = actionFilter === 'all' || log.action === actionFilter;
-    const matchesEntity = entityFilter === 'all' || log.entity === entityFilter;
-    
-    if (dateFilter === 'all') return matchesSearch && matchesAction && matchesEntity;
-    
-    const logDate = new Date(log.createdAt);
-    const now = new Date();
-    if (dateFilter === '24h') {
-      return matchesSearch && matchesAction && matchesEntity && (now.getTime() - logDate.getTime()) < 24 * 60 * 60 * 1000;
+  const filteredLogs = logs;
+
+  const totalPages = Math.ceil(totalLogs / itemsPerPage);
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      setSelectedLog(null);
     }
-    if (dateFilter === '7d') {
-      return matchesSearch && matchesAction && matchesEntity && (now.getTime() - logDate.getTime()) < 7 * 24 * 60 * 60 * 1000;
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      setSelectedLog(null);
     }
-    if (dateFilter === '30d') {
-      return matchesSearch && matchesAction && matchesEntity && (now.getTime() - logDate.getTime()) < 30 * 24 * 60 * 60 * 1000;
+  };
+
+  const handlePageJump = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      setSelectedLog(null);
     }
-    return matchesSearch && matchesAction && matchesEntity;
-  });
+  };
+
+  const handleItemsPerPageChange = (newValue: number) => {
+    setItemsPerPage(newValue);
+    setCurrentPage(1);
+    setSelectedLog(null);
+  };
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -171,30 +192,46 @@ export default function AdminAuditPage() {
 
   const formatLogDescription = (log: AuditLog) => {
     const details = log.details || {};
+    const entityLabel = getEntityLabel(log.entity);
+    
     switch (log.action) {
       case 'LOGIN':
-        return `fez login no sistema`;
+        return `Fez login no sistema`;
       case 'LOGOUT':
-        return `saiu do sistema`;
+        return `Saiu do sistema`;
       case 'CREATE':
-        return `criou ${log.entity} "${details.name || details.email || log.entityId}"`;
+        return `Criou ${entityLabel} "${details.name || details.email || details.clientName || log.entityId}"`;
       case 'UPDATE':
         if (details.field) {
-          return `atualizou ${details.field} em ${log.entity}`;
+          return `Atualizou ${details.field} em ${entityLabel}`;
         }
         if (details.plan) {
-          return `alterou plano de ${details.plan.from} para ${details.plan.to}`;
+          return `Alterou plano de ${details.plan.from} para ${details.plan.to}`;
         }
-        return `atualizou ${log.entity}`;
+        return `Atualizou ${entityLabel}`;
       case 'DELETE':
-        return `excluiu ${log.entity} "${details.clientName || log.entityId}"`;
+        return `Excluiu ${entityLabel} "${details.clientName || log.entityId}"`;
       case 'VIEW':
-        return `visualizou ${details.page || log.entity}`;
+        return `Visualizou ${details.page || entityLabel}`;
       case 'EXPORT':
-        return `exportou ${details.records} registros de ${log.entity}`;
+        return `Exportou ${details.records} registros de ${entityLabel}`;
       default:
-        return `realizou ação em ${log.entity}`;
+        return `Realizou ação em ${entityLabel}`;
     }
+  };
+
+  const getEntityLabel = (entity: string) => {
+    const labels: Record<string, string> = {
+      User: 'Usuário',
+      Restaurant: 'Restaurante',
+      Customer: 'Cliente',
+      Subscription: 'Assinatura',
+      Payment: 'Pagamento',
+      WhiteLabel: 'White Label',
+      Analytics: 'Análise',
+      Admin: 'Admin'
+    };
+    return labels[entity] || entity;
   };
 
   const uniqueEntities = [...new Set(logs.map(log => log.entity))];
@@ -271,13 +308,19 @@ export default function AdminAuditPage() {
                 type="text"
                 placeholder="Buscar por usuário ou entidade..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <select
               value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
+              onChange={(e) => {
+                setActionFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">Todas as Ações</option>
@@ -291,17 +334,26 @@ export default function AdminAuditPage() {
             </select>
             <select
               value={entityFilter}
-              onChange={(e) => setEntityFilter(e.target.value)}
+              onChange={(e) => {
+                setEntityFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">Todas as Entidades</option>
-              {uniqueEntities.map(entity => (
-                <option key={entity} value={entity}>{entity}</option>
-              ))}
+              <option value="User">Usuário</option>
+              <option value="Restaurant">Restaurante</option>
+              <option value="Customer">Cliente</option>
+              <option value="Subscription">Assinatura</option>
+              <option value="Payment">Pagamento</option>
+              <option value="WhiteLabel">White Label</option>
             </select>
             <select
               value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
+              onChange={(e) => {
+                setDateFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">Todo o período</option>
@@ -330,8 +382,17 @@ export default function AdminAuditPage() {
               return (
                 <div
                   key={log.id}
-                  className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                  className="p-4 hover:bg-gray-50 hover:shadow-sm cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 rounded-lg"
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={selectedLog?.id === log.id}
                   onClick={() => setSelectedLog(selectedLog?.id === log.id ? null : log)}
+                  onKeyDown={(e: React.KeyboardEvent) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedLog(selectedLog?.id === log.id ? null : log);
+                    }
+                  }}
                 >
                   <div className="flex items-start space-x-4">
                     <div className={`p-2 rounded-lg ${getActionColor(log.action)}`}>
@@ -393,9 +454,12 @@ export default function AdminAuditPage() {
                         </div>
                       )}
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex items-center justify-end space-x-2">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getActionColor(log.action)}`}>
                         {getActionLabel(log.action)}
+                      </span>
+                      <span className="text-gray-400">
+                        {selectedLog?.id === log.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       </span>
                     </div>
                   </div>
@@ -406,16 +470,79 @@ export default function AdminAuditPage() {
         </div>
 
         {/* Pagination placeholder */}
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">
-            Mostrando {filteredLogs.length} de {stats.totalLogs} logs
-          </p>
-          <div className="flex space-x-2">
-            <Button variant="secondary" size="sm" disabled>
+        <div className="flex flex-col gap-4 bg-white rounded-xl p-4 border border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center space-x-3">
+              <label htmlFor="itemsPerPage" className="text-sm text-gray-600">
+                Itens por página:
+              </label>
+              <select
+                id="itemsPerPage"
+                value={itemsPerPage}
+                onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              >
+                <option value={10}>10</option>
+                <option value={12}>12</option>
+                <option value={13}>13</option>
+                <option value={20}>20</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+            <p className="text-sm text-gray-600">
+              Mostrando <span className="font-semibold">{filteredLogs.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> a <span className="font-semibold">{Math.min(currentPage * itemsPerPage, totalLogs)}</span> de <span className="font-semibold">{totalLogs}</span> logs
+            </p>
+          </div>
+          
+          <div className="flex items-center justify-center space-x-2">
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              disabled={currentPage === 1}
+              onClick={handlePreviousPage}
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
               Anterior
             </Button>
-            <Button variant="secondary" size="sm">
+            
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => handlePageJump(pageNum)}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                      currentPage === pageNum
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <Button 
+              variant="secondary" 
+              size="sm"
+              disabled={currentPage === totalPages}
+              onClick={handleNextPage}
+            >
               Próximo
+              <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           </div>
         </div>
