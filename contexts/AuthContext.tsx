@@ -26,6 +26,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  switchRestaurant: (restaurantId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -103,6 +104,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const switchRestaurant = async (restaurantId: string) => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('restaurantToken');
+      
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/users/current-restaurant/${restaurantId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Falha ao trocar restaurante');
+      }
+
+      const data = await response.json();
+      
+      if (data.data?.user) {
+        const updatedUser = data.data.user;
+        setUser(updatedUser);
+        localStorage.setItem('restaurantUser', JSON.stringify(updatedUser));
+        
+        // Redirecionar para dashboard do novo restaurante
+        router.push('/dashboard');
+      }
+    } catch (error) {
+      console.error('Switch restaurant error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -111,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!user,
         login,
         logout,
+        switchRestaurant,
       }}
     >
       {children}

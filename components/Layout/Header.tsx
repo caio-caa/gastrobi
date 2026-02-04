@@ -5,6 +5,7 @@ import {
   Menu,
   ChevronDown,
   LogOut,
+  Building2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -13,8 +14,23 @@ interface HeaderProps {
 }
 
 function Header({ onMenuClick }: HeaderProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, switchRestaurant } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showRestaurantMenu, setShowRestaurantMenu] = useState(false);
+  const [isSwitching, setIsSwitching] = useState(false);
+
+  const handleRestaurantSwitch = async (restaurantId: string) => {
+    try {
+      setIsSwitching(true);
+      await switchRestaurant(restaurantId);
+      setShowRestaurantMenu(false);
+    } catch (error) {
+      console.error('Erro ao trocar restaurante:', error);
+      alert('Erro ao trocar restaurante. Tente novamente.');
+    } finally {
+      setIsSwitching(false);
+    }
+  };
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-100 relative z-40">
@@ -40,6 +56,57 @@ function Header({ onMenuClick }: HeaderProps) {
 
         {/* Right Section */}
         <div className="flex items-center space-x-2 lg:space-x-4">
+          {/* Trocar Restaurante */}
+          {user && user.restaurants && user.restaurants.length > 1 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowRestaurantMenu(!showRestaurantMenu)}
+                className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                title="Trocar restaurante"
+              >
+                <Building2 className="w-4 h-4 text-gray-600" />
+                <span className="text-xs lg:text-sm text-gray-600">
+                  {user.currentRestaurant.name}
+                </span>
+                <ChevronDown className="w-3 h-3 text-gray-500" />
+              </button>
+
+              {showRestaurantMenu && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-100 z-50">
+                  <div className="py-2">
+                    <div className="px-4 py-2 border-b border-gray-100">
+                      <p className="text-xs text-gray-500 font-semibold">
+                        MEUS RESTAURANTES
+                      </p>
+                    </div>
+
+                    {user.restaurants.map((restaurant) => (
+                      <button
+                        key={restaurant.id}
+                        onClick={() => handleRestaurantSwitch(restaurant.id)}
+                        disabled={
+                          isSwitching ||
+                          restaurant.id === user.currentRestaurant.id
+                        }
+                        className={`w-full text-left px-4 py-2 text-sm flex items-center space-x-2 transition-colors ${
+                          restaurant.id === user.currentRestaurant.id
+                            ? 'bg-blue-50 text-blue-700 font-medium'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        } ${isSwitching ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Building2 className="w-4 h-4" />
+                        <span>{restaurant.name}</span>
+                        {restaurant.id === user.currentRestaurant.id && (
+                          <span className="ml-auto text-xs">✓</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Menu do Usuário */}
           <div className="relative">
             <button
