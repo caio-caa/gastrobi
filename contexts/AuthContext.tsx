@@ -94,74 +94,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       if (USE_REAL_API) {
-        try {
-          // Login via API real
-          const response = await authApi.loginAdmin(email, password);
-          
-          if (response.error || !response.data) {
-            throw new Error(response.error || 'Erro ao fazer login');
-          }
-
-          const userData: User = {
-            id: response.data.user?.id || '1',
-            name: response.data.user?.fullName || 'Admin GastroBI',
-            email: response.data.user?.email || email,
-            role: (response.data.user?.role?.toLowerCase() || 'super_admin') as User['role'],
-            type: response.data.user?.type || 'ADMIN',
-            permissions: ['all'],
-            lastLogin: new Date(),
-            isEmailVerified: true,
-            twoFactorEnabled: false,
-          };
-
-          localStorage.setItem('gastrobi_user_data', JSON.stringify(userData));
-          // Salvar token JWT para requisições autenticadas
-          if (response.data.token) {
-            localStorage.setItem('gastrobi_token', response.data.token);
-          }
-          setUser(userData);
-        } catch (apiError) {
-          // Se a API falhar, usar mock para desenvolvimento
-          console.warn('API indisponível, usando modo mock');
-          const userData: User = {
-            id: '1',
-            name: 'Admin GastroBI',
-            email,
-            role: 'super_admin',
-            type: 'ADMIN',
-            lastLogin: new Date(),
-            isEmailVerified: true,
-            twoFactorEnabled: false,
-            permissions: ['all'],
-          };
-
-          localStorage.setItem('gastrobi_user_data', JSON.stringify(userData));
-          setUser(userData);
+        // Login via API real - sem fallback para mock
+        const response = await authApi.loginAdmin(email, password);
+        
+        if (response.error) {
+          throw new Error(response.error);
         }
+
+        if (!response.data || !response.data.user) {
+          throw new Error('Resposta inválida do servidor');
+        }
+
+        // Validação obrigatória de dados
+        if (!response.data.user.id || !response.data.user.email) {
+          throw new Error('Dados do usuário incompletos');
+        }
+
+        const userData: User = {
+          id: response.data.user.id,
+          name: response.data.user.fullName || 'Usuário',
+          email: response.data.user.email,
+          role: (response.data.user.role?.toLowerCase() || 'admin') as User['role'],
+          type: response.data.user.type || 'ADMIN',
+          permissions: response.data.user.permissions || ['all'],
+          lastLogin: new Date(),
+          isEmailVerified: response.data.user.isEmailVerified ?? true,
+          twoFactorEnabled: response.data.user.twoFactorEnabled ?? false,
+        };
+
+        // Validar que user foi criado corretamente
+        if (!userData.id || !userData.email) {
+          throw new Error('Falha ao processar dados do usuário');
+        }
+
+        localStorage.setItem('gastrobi_user_data', JSON.stringify(userData));
+        
+        // Salvar token JWT
+        if (response.data.token) {
+          localStorage.setItem('gastrobi_token', response.data.token);
+        }
+        
+        setUser(userData);
+        console.log('✅ [AUTH] Login bem-sucedido:', userData.email);
       } else {
         // Login mock para desenvolvimento
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        if (email && password) {
-          const userData: User = {
-            id: '1',
-            name: 'Admin GastroBI',
-            email,
-            role: 'super_admin',
-            type: 'ADMIN',
-            lastLogin: new Date(),
-            isEmailVerified: true,
-            twoFactorEnabled: false,
-            permissions: ['all'],
-          };
-
-          localStorage.setItem('gastrobi_user_data', JSON.stringify(userData));
-          setUser(userData);
-        } else {
+        if (!email || !password) {
           throw new Error('Email e senha são obrigatórios');
         }
+
+        const userData: User = {
+          id: '1',
+          name: 'Admin GastroBI',
+          email,
+          role: 'super_admin',
+          type: 'ADMIN',
+          lastLogin: new Date(),
+          isEmailVerified: true,
+          twoFactorEnabled: false,
+          permissions: ['all'],
+        };
+
+        localStorage.setItem('gastrobi_user_data', JSON.stringify(userData));
+        setUser(userData);
+        console.log('✅ [AUTH] Login mock bem-sucedido:', email);
       }
     } catch (error) {
+      console.error('❌ [AUTH] Erro no login:', error);
+      setUser(null);
+      localStorage.removeItem('gastrobi_user_data');
+      localStorage.removeItem('gastrobi_token');
       throw error;
     } finally {
       setLoading(false);

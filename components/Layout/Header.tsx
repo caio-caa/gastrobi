@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Menu,
   ChevronDown,
@@ -15,6 +16,7 @@ interface HeaderProps {
 }
 
 function Header({ onMenuClick }: HeaderProps) {
+  const router = useRouter();
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -90,8 +92,11 @@ function Header({ onMenuClick }: HeaderProps) {
 
                   <button
                     onClick={() => {
+                      console.log('🔵 [LOGOUT] Fazendo logout...');
                       logout();
                       setShowUserMenu(false);
+                      console.log('✅ [LOGOUT] Redirecionando para login');
+                      router.push('/login');
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
                   >

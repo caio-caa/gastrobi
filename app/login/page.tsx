@@ -21,8 +21,8 @@ import Button from '@/components/ui/Button';
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [email, setEmail] = useState('admin@gastrobi.com');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
@@ -47,13 +47,29 @@ export default function LoginPage() {
 
     if (mode === 'login') {
       try {
+        console.log('🔵 [LOGIN] Tentando fazer login com:', email);
         await login(email, password, rememberMe);
-        // Redirect to admin analytics after successful login
+        
+        // Validar que o usuário foi setado antes de redirecionar
+        const userData = localStorage.getItem('gastrobi_user_data');
+        if (!userData) {
+          throw new Error('Falha ao processar login - dados não salvos');
+        }
+        
+        const user = JSON.parse(userData);
+        if (!user.id || !user.email) {
+          throw new Error('Dados do usuário incompletos - login inválido');
+        }
+        
+        console.log('✅ [LOGIN] Login validado, redirecionando para dashboard');
+        // Só redireciona se tudo estiver ok
         router.push('/admin/analytics');
       } catch (err: unknown) {
-        if (err instanceof Error) {
-          setError(err.message || 'Erro ao fazer login');
-        }
+        console.error('❌ [LOGIN] Erro:', err);
+        setError(err instanceof Error ? err.message : 'Erro ao fazer login');
+        // Garantir que não redireciona em caso de erro
+        localStorage.removeItem('gastrobi_user_data');
+        localStorage.removeItem('gastrobi_token');
       }
     } else {
       handleSignup();

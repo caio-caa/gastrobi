@@ -14,6 +14,13 @@ export default function UploadExamplePage() {
   const { user } = useAuth();
   const token = localStorage.getItem('gastrobi_token') || '';
 
+  React.useEffect(() => {
+    console.log('🔵 [PAGE] Dados carregados:', {
+      user: user ? `${user.name} (${user.id})` : 'Sem usuário',
+      token: token ? `Presente (${token.length} chars)` : 'Ausente',
+    });
+  }, [user, token]);
+
   if (!user || !token) {
     return (
       <div className="flex items-center justify-center min-h-screen">

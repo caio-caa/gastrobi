@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   TrendingUp,
   DollarSign,
@@ -23,6 +24,7 @@ import Button from '@/components/ui/Button';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { analyticsApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AnalyticsData {
   overview: {
@@ -71,17 +73,29 @@ interface AnalyticsData {
 }
 
 export default function SaaSAnalyticsPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('30');
 
   useEffect(() => {
-    loadAnalyticsData();
-  }, [dateRange]);
+    // Proteção de rota - redirecionar se não autenticado
+    if (!authLoading && !user) {
+      console.log('🔐 [ANALYTICS] Usuário não autenticado, redirecionando para login');
+      router.push('/login');
+      return;
+    }
+
+    if (user) {
+      loadAnalyticsData();
+    }
+  }, [dateRange, user, authLoading, router]);
 
   const loadAnalyticsData = async () => {
     setLoading(true);
     try {
+      console.log('📊 [ANALYTICS] Carregando dados...');
       const [overview, revenue, growth, retention] = await Promise.all([
         analyticsApi.overview(),
         analyticsApi.revenue(
@@ -92,34 +106,40 @@ export default function SaaSAnalyticsPage() {
         analyticsApi.retention()
       ]);
 
-      if (overview.data) {
-        const data: AnalyticsData = {
-          overview: {
-            totalRevenue: overview.data.totalRevenue || 0,
-            monthlyRevenue: overview.data.monthlyRecurringRevenue || 0,
-            totalClients: overview.data.totalRestaurants || 0,
-            activeClients: Math.floor((overview.data.totalRestaurants || 0) * 0.85),
-            totalUsers: overview.data.totalUsers || 0,
-            activeUsers: Math.floor((overview.data.totalUsers || 0) * 0.85),
-            totalRestaurants: overview.data.totalRestaurants || 0,
-            conversionRate: 78.5,
-            churnRate: growth.data?.churnRate || 3.2,
-            avgRevenuePerUser: (overview.data.totalRevenue || 0) / Math.max(overview.data.totalUsers || 1, 1)
-          },
-          revenueByPlan: [
-            { plan: 'Básico', revenue: (revenue.data?.revenueByPlan?.BASIC || 0), clients: 25, color: '#3b82f6' },
-            { plan: 'Premium', revenue: (revenue.data?.revenueByPlan?.PREMIUM || 0), clients: 15, color: '#10b981' },
-            { plan: 'Enterprise', revenue: (revenue.data?.revenueByPlan?.ENTERPRISE || 0), clients: 5, color: '#8b5cf6' }
-          ],
-          growthData: revenue.data?.dailyRevenue || [],
-          clientActivity: [],
-          alerts: []
-        };
-
-        setAnalyticsData(data);
+      // Validar que temos os dados essenciais
+      if (!overview.data) {
+        throw new Error('Falha ao carregar dados de overview');
       }
+
+      console.log('✅ [ANALYTICS] Dados carregados com sucesso');
+      const data: AnalyticsData = {
+        overview: {
+          totalRevenue: overview.data.totalRevenue || 0,
+          monthlyRevenue: overview.data.monthlyRecurringRevenue || 0,
+          totalClients: overview.data.totalRestaurants || 0,
+          activeClients: Math.floor((overview.data.totalRestaurants || 0) * 0.85),
+          totalUsers: overview.data.totalUsers || 0,
+          activeUsers: Math.floor((overview.data.totalUsers || 0) * 0.85),
+          totalRestaurants: overview.data.totalRestaurants || 0,
+          conversionRate: 78.5,
+          churnRate: growth.data?.churnRate || 3.2,
+          avgRevenuePerUser: (overview.data.totalRevenue || 0) / Math.max(overview.data.totalUsers || 1, 1)
+        },
+        revenueByPlan: [
+          { plan: 'Básico', revenue: (revenue.data?.revenueByPlan?.BASIC || 0), clients: 25, color: '#3b82f6' },
+          { plan: 'Premium', revenue: (revenue.data?.revenueByPlan?.PREMIUM || 0), clients: 15, color: '#10b981' },
+          { plan: 'Enterprise', revenue: (revenue.data?.revenueByPlan?.ENTERPRISE || 0), clients: 5, color: '#8b5cf6' }
+        ],
+        growthData: revenue.data?.dailyRevenue || [],
+        clientActivity: [],
+        alerts: []
+      };
+
+      setAnalyticsData(data);
     } catch (error) {
-      console.error('Erro ao carregar analytics:', error);
+      console.error('❌ [ANALYTICS] Erro ao carregar:', error);
+      // Mostrar erro ao usuário em vez de deixar em branco
+      setAnalyticsData(null);
     } finally {
       setLoading(false);
     }
@@ -149,11 +169,47 @@ export default function SaaSAnalyticsPage() {
     }
   };
 
-  if (loading || !analyticsData) {
+  // Aguardar autenticação ser verificada
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+      </div>
+    );
+  }
+
+  // Se não autenticado, não renderiza nada (a rota já vai redirecionar)
+  if (!user) {
+    return null;
+  }
+
+  if (loading) {
     return (
       <Layout>
         <div className="flex items-center justify-center h-96">
           <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!analyticsData) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Erro ao carregar dados</h2>
+            <p className="text-gray-600 mb-6">Não foi possível carregar os dados de analytics.</p>
+            <Button 
+              onClick={loadAnalyticsData}
+              variant="primary"
+              size="md"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Tentar novamente
+            </Button>
+          </div>
         </div>
       </Layout>
     );
