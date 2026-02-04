@@ -19,6 +19,11 @@ function Header({ onMenuClick }: HeaderProps) {
   const [showRestaurantMenu, setShowRestaurantMenu] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
 
+  // Filtra restaurantes que são diferentes do atual
+  const otherRestaurants = user?.restaurants?.filter(
+    (r) => r.id !== user.currentRestaurant.id
+  ) || [];
+
   const handleRestaurantSwitch = async (restaurantId: string) => {
     try {
       setIsSwitching(true);
@@ -57,21 +62,23 @@ function Header({ onMenuClick }: HeaderProps) {
         {/* Right Section */}
         <div className="flex items-center space-x-2 lg:space-x-4">
           {/* Trocar Restaurante */}
-          {user && user.restaurants && user.restaurants.length > 1 && (
+          {user && user.currentRestaurant && (
             <div className="relative">
               <button
                 onClick={() => setShowRestaurantMenu(!showRestaurantMenu)}
                 className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                title="Trocar restaurante"
+                title="Restaurante"
               >
                 <Building2 className="w-4 h-4 text-gray-600" />
                 <span className="text-xs lg:text-sm text-gray-600">
                   {user.currentRestaurant.name}
                 </span>
-                <ChevronDown className="w-3 h-3 text-gray-500" />
+                {otherRestaurants.length > 0 && (
+                  <ChevronDown className="w-3 h-3 text-gray-500" />
+                )}
               </button>
 
-              {showRestaurantMenu && (
+              {showRestaurantMenu && otherRestaurants.length > 0 && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-100 z-50">
                   <div className="py-2">
                     <div className="px-4 py-2 border-b border-gray-100">
@@ -80,25 +87,17 @@ function Header({ onMenuClick }: HeaderProps) {
                       </p>
                     </div>
 
-                    {user.restaurants.map((restaurant) => (
+                    {otherRestaurants.map((restaurant) => (
                       <button
                         key={restaurant.id}
                         onClick={() => handleRestaurantSwitch(restaurant.id)}
-                        disabled={
-                          isSwitching ||
-                          restaurant.id === user.currentRestaurant.id
-                        }
-                        className={`w-full text-left px-4 py-2 text-sm flex items-center space-x-2 transition-colors ${
-                          restaurant.id === user.currentRestaurant.id
-                            ? 'bg-blue-50 text-blue-700 font-medium'
-                            : 'text-gray-700 hover:bg-gray-100'
-                        } ${isSwitching ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={isSwitching}
+                        className={`w-full text-left px-4 py-2 text-sm flex items-center space-x-2 transition-colors text-gray-700 hover:bg-gray-100 ${
+                          isSwitching ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
                       >
                         <Building2 className="w-4 h-4" />
                         <span>{restaurant.name}</span>
-                        {restaurant.id === user.currentRestaurant.id && (
-                          <span className="ml-auto text-xs">✓</span>
-                        )}
                       </button>
                     ))}
                   </div>
