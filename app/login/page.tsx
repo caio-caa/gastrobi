@@ -392,40 +392,27 @@ export default function LoginPage() {
           </div>
         </div>
 
-          {/* Demo Info - apenas no login */}
-          {mode === 'login' && (
-            <div className="px-8 py-4 bg-gray-50 border-t border-gray-100">
-              <div className="text-center">
-                <p className="text-sm text-gray-600 mb-2">
-                  <strong>Demo:</strong> Use as credenciais abaixo
-                </p>
-                <div className="bg-white p-3 rounded-lg border border-gray-100">
-                  <p className="text-sm font-mono text-gray-800">admin@gastrobi.com</p>
-                  <p className="text-sm font-mono text-gray-800">123456</p>
-                </div>
-              </div>
-            </div>
-          )}
+
         </div>
 
         {/* Features */}
         <div className="mt-8 grid grid-cols-2 gap-4 text-center">
           <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
             <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-              <Shield className="w-4 h-4 text-blue-600" />
+              <ChefHat className="w-4 h-4 text-blue-600" />
             </div>
-            <p className="text-sm font-medium text-gray-900">Segurança</p>
-            <p className="text-xs text-gray-500">Dados criptografados</p>
+            <p className="text-sm font-medium text-gray-900">Cardápio Digital</p>
+            <p className="text-xs text-gray-500">Gerenciador completo</p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
             <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-2">
               <ChefHat className="w-4 h-4 text-green-600" />
             </div>
             <p className="text-sm font-medium text-gray-900">
-              {mode === 'login' ? 'Multi-tenant' : 'Teste Grátis'}
+              {mode === 'login' ? 'Relatórios' : 'Teste Grátis'}
             </p>
             <p className="text-xs text-gray-500">
-              {mode === 'login' ? 'Múltiplos restaurantes' : '30 dias gratuitos'}
+              {mode === 'login' ? 'Análises em tempo real' : '30 dias gratuitos'}
             </p>
           </div>
         </div>
