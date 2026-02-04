@@ -115,6 +115,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
 
           localStorage.setItem('gastrobi_user_data', JSON.stringify(userData));
+          // Salvar token JWT para requisições autenticadas
+          if (response.data.token) {
+            localStorage.setItem('gastrobi_token', response.data.token);
+          }
           setUser(userData);
         } catch (apiError) {
           // Se a API falhar, usar mock para desenvolvimento
