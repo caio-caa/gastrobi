@@ -5,7 +5,6 @@ import {
   ShoppingCart,
   Truck,
   Users,
-  ClipboardList,
   ChefHat,
   Store,
 } from 'lucide-react';
@@ -14,12 +13,11 @@ import Layout from '@/components/Layout/Layout';
 import BalcaoModule from '@/components/POS/BalcaoModule';
 import DeliveryModule from '@/components/POS/DeliveryModule';
 import MesaModule from '@/components/POS/MesaModule';
-import ComandaModule from '@/components/POS/ComandaModule';
 import KitchenModule from '@/components/POS/KitchenModule';
 
 export default function POSPage() {
   const [activeModule, setActiveModule] = useState<
-    'balcao' | 'delivery' | 'mesa' | 'comanda' | 'kitchen'
+    'balcao' | 'delivery' | 'mesa' | 'kitchen'
   >('balcao');
   const { orders, getKitchenOrders } = usePOS();
 
@@ -46,13 +44,6 @@ export default function POSPage() {
       color: 'bg-purple-500',
     },
     {
-      id: 'comanda' as const,
-      name: 'Comanda',
-      icon: ClipboardList,
-      description: 'Sistema para garçons',
-      color: 'bg-orange-500',
-    },
-    {
       id: 'kitchen' as const,
       name: 'Cozinha',
       icon: ChefHat,
@@ -75,10 +66,6 @@ export default function POSPage() {
         return orders.filter(
           (o) => o.type === 'mesa' && o.status !== 'completed'
         ).length;
-      case 'comanda':
-        return orders.filter(
-          (o) => o.type === 'comanda' && o.status !== 'completed'
-        ).length;
       case 'kitchen':
         return getKitchenOrders().filter((item) => item.status === 'preparing')
           .length;
@@ -95,8 +82,6 @@ export default function POSPage() {
         return <DeliveryModule />;
       case 'mesa':
         return <MesaModule />;
-      case 'comanda':
-        return <ComandaModule />;
       case 'kitchen':
         return <KitchenModule />;
       default:
