@@ -411,12 +411,14 @@ export const campaignsApi = {
 // ==================== UPLOADS ====================
 
 export const uploadsApi = {
-  uploadImage: async (file: File, restaurantId: string) => {
+  uploadImage: async (file: File, restaurantId: string, folder?: 'products' | 'categories' | 'logos' | 'covers' | 'misc') => {
     const formData = new FormData();
     formData.append('file', file);
 
+    const query = folder ? `?folder=${folder}` : '';
+
     try {
-      const response = await fetch(`${API_BASE_URL}/uploads/image`, {
+      const response = await fetch(`${API_BASE_URL}/uploads/image${query}`, {
         method: 'POST',
         body: formData,
         credentials: 'include',
@@ -430,7 +432,7 @@ export const uploadsApi = {
       }
 
       const data = await response.json();
-      return { data, status: response.status };
+      return { data: { url: data.url, publicId: data.publicId }, status: response.status };
     } catch (error) {
       console.error('Upload error:', error);
       return { error: 'Erro de conexão ao fazer upload', status: 500 };

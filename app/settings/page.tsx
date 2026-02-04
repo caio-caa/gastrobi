@@ -19,11 +19,16 @@ import Layout from '@/components/Layout/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
+import RestaurantSettings from '@/components/ui/RestaurantSettings';
+import { useMenuApi } from '@/lib/hooks/useMenuApi';
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('restaurant');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  
+  const restaurantId = user?.currentRestaurant?.id || '';
+  const { updateRestaurantSettings, loading: apiLoading } = useMenuApi({ restaurantId });
   
   const [restaurantData, setRestaurantData] = useState({
     name: user?.currentRestaurant?.name || 'Restaurante do João',
@@ -33,6 +38,8 @@ export default function SettingsPage() {
     cnpj: '12.345.678/0001-90',
     website: 'www.restaurante.com.br',
     description: 'Restaurante especializado em culinária italiana com ambiente aconchegante e pratos tradicionais.',
+    logo: user?.currentRestaurant?.logo || '',
+    coverImage: user?.currentRestaurant?.coverImage || '',
     openingHours: {
       monday: { open: '11:00', close: '23:00', closed: false },
       tuesday: { open: '11:00', close: '23:00', closed: false },
@@ -130,6 +137,16 @@ export default function SettingsPage() {
     sunday: 'Domingo'
   };
 
+  const handleSaveRestaurant = async (data: any) => {
+    try {
+      await updateRestaurantSettings(data);
+      setRestaurantData(data);
+      alert('Configurações do restaurante salvas com sucesso!');
+    } catch (error) {
+      alert('Erro ao salvar configurações. Tente novamente.');
+    }
+  };
+
   const handleSave = () => {
     alert('Configurações salvas com sucesso!');
   };
@@ -145,59 +162,12 @@ export default function SettingsPage() {
   };
 
   const renderRestaurantSettings = () => (
-    <div className="space-y-8">
-      {/* Informações Básicas */}
-      <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Informações Básicas</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nome do restaurante
-            </label>
-            <input
-              type="text"
-              value={restaurantData.name}
-              onChange={(e) => setRestaurantData({ ...restaurantData, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              CNPJ
-            </label>
-            <input
-              type="text"
-              value={restaurantData.cnpj}
-              onChange={(e) => setRestaurantData({ ...restaurantData, cnpj: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Endereço completo
-            </label>
-            <input
-              type="text"
-              value={restaurantData.address}
-              onChange={(e) => setRestaurantData({ ...restaurantData, address: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Telefone
-            </label>
-            <input
-              type="tel"
-              value={restaurantData.phone}
-              onChange={(e) => setRestaurantData({ ...restaurantData, phone: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              E-mail
-            </label>
+    <RestaurantSettings
+      restaurantId={restaurantId}
+      initialData={restaurantData}
+      onSave={handleSaveRestaurant}
+    />
+  );
             <input
               type="email"
               value={restaurantData.email}
