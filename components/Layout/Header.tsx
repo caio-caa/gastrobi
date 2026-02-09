@@ -7,7 +7,7 @@ import {
   LogOut,
   Building2,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, getRoleLabel, isWaiterRole } from '@/contexts/AuthContext';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -54,15 +54,15 @@ function Header({ onMenuClick }: HeaderProps) {
               {user?.currentRestaurant.name || 'Carregando...'}
             </h1>
             <p className="text-xs lg:text-sm text-gray-500">
-              {user?.role && `${user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase()}`}
+              {getRoleLabel(user?.role)}
             </p>
           </div>
         </div>
 
         {/* Right Section */}
         <div className="flex items-center space-x-2 lg:space-x-4">
-          {/* Trocar Restaurante */}
-          {user && user.currentRestaurant && (
+          {/* Trocar Restaurante - apenas admin */}
+          {user && user.currentRestaurant && !isWaiterRole(user.role) && (
             <div className="relative">
               <button
                 onClick={() => setShowRestaurantMenu(!showRestaurantMenu)}
@@ -133,12 +133,8 @@ function Header({ onMenuClick }: HeaderProps) {
                 <div className="py-2">
                   <div className="px-4 py-2 border-b border-gray-100">
                     <p className="text-xs text-gray-500">Logado como</p>
-                    <p className="text-sm font-medium text-gray-900 capitalize">
-                      {user?.role === 'OWNER'
-                        ? 'Proprietário'
-                        : user?.role === 'MANAGER'
-                        ? 'Gerente'
-                        : 'Funcionário'}
+                    <p className="text-sm font-medium text-gray-900">
+                      {getRoleLabel(user?.role)}
                     </p>
                   </div>
 

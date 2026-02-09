@@ -15,9 +15,51 @@ interface User {
   email: string;
   fullName: string;
   type: 'RESTAURANT';
-  role: 'OWNER' | 'MANAGER' | 'STAFF';
+  role: 'OWNER' | 'MANAGER' | 'STAFF' | 'WAITER';
   currentRestaurant: Restaurant;
   restaurants: Restaurant[];
+}
+
+// Roles que têm acesso administrativo
+const ADMIN_ROLES: User['role'][] = ['OWNER', 'MANAGER'];
+// Roles que são garçom (acesso limitado)
+const WAITER_ROLES: User['role'][] = ['WAITER'];
+
+// Páginas acessíveis por garçom
+export const WAITER_ALLOWED_ROUTES = ['/pos', '/menu', '/qr-codes'];
+// Página padrão para cada perfil
+export const DEFAULT_ROUTE_BY_ROLE: Record<string, string> = {
+  OWNER: '/dashboard',
+  MANAGER: '/dashboard',
+  STAFF: '/dashboard',
+  WAITER: '/pos',
+};
+
+// Helpers de role
+export function isAdminRole(role?: User['role']): boolean {
+  return !!role && ADMIN_ROLES.includes(role);
+}
+
+export function isWaiterRole(role?: User['role']): boolean {
+  return !!role && WAITER_ROLES.includes(role);
+}
+
+export function getRoleLabel(role?: User['role']): string {
+  const labels: Record<string, string> = {
+    OWNER: 'Proprietário',
+    MANAGER: 'Gerente',
+    STAFF: 'Funcionário',
+    WAITER: 'Garçom',
+  };
+  return role ? labels[role] || role : '';
+}
+
+export function canAccessRoute(role: User['role'] | undefined, pathname: string): boolean {
+  if (!role) return false;
+  // Admin pode tudo
+  if (isAdminRole(role)) return true;
+  // Garçom só pode acessar rotas permitidas
+  return WAITER_ALLOWED_ROUTES.some(route => pathname.startsWith(route));
 }
 
 interface AuthContextType {
@@ -80,7 +122,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Save user to localStorage for persistence
         localStorage.setItem('restaurantUser', JSON.stringify(userData));
         
-        router.push(`/dashboard/${userData.currentRestaurant.id}`);
+        // Redirecionar baseado no role
+        const defaultRoute = DEFAULT_ROUTE_BY_ROLE[userData.role] || '/dashboard';
+        router.push(defaultRoute);
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -131,8 +175,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(updatedUser);
         localStorage.setItem('restaurantUser', JSON.stringify(updatedUser));
         
-        // Redirecionar para dashboard do novo restaurante
-        router.push('/dashboard');
+        // Redirecionar baseado no role
+        const defaultRoute = DEFAULT_ROUTE_BY_ROLE[updatedUser.role] || '/dashboard';
+        router.push(defaultRoute);
       }
     } catch (error) {
       console.error('Switch restaurant error:', error);

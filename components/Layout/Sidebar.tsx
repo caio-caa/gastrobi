@@ -15,7 +15,7 @@ import {
   QrCode,
   Calculator,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, isWaiterRole } from '@/contexts/AuthContext';
 import { useWhiteLabel } from '@/contexts/WhiteLabelContext';
 import WhiteLabelHeader from '@/components/WhiteLabel/WhiteLabelHeader';
 
@@ -24,17 +24,17 @@ interface SidebarProps {
   setOpen: (open: boolean) => void;
 }
 
-// Admin Restaurante Navigation - Menu completo para Owner/Manager
-const restauranteNavigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Clientes', href: '/customers', icon: Users },
-  { name: 'Fidelidade', href: '/loyalty', icon: Gift, comingSoon: true },
-  { name: 'Campanhas', href: '/campaigns', icon: Megaphone, comingSoon: true },
-  { name: 'Cardápio Digital', href: '/menu', icon: MenuIcon },
-  { name: 'QR Codes', href: '/qr-codes', icon: QrCode },
-  { name: 'POS - Frente de Caixa', href: '/pos', icon: Calculator },
-  { name: 'Relatórios', href: '/reports', icon: BarChart3 },
-  { name: 'Configurações', href: '/settings', icon: Settings },
+// Definição com roles permitidos por item
+const allNavigation = [
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, adminOnly: true },
+  { name: 'Clientes', href: '/customers', icon: Users, adminOnly: true },
+  { name: 'Fidelidade', href: '/loyalty', icon: Gift, comingSoon: true, adminOnly: true },
+  { name: 'Campanhas', href: '/campaigns', icon: Megaphone, comingSoon: true, adminOnly: true },
+  { name: 'Cardápio Digital', href: '/menu', icon: MenuIcon, adminOnly: false },
+  { name: 'QR Codes', href: '/qr-codes', icon: QrCode, adminOnly: false },
+  { name: 'POS - Frente de Caixa', href: '/pos', icon: Calculator, adminOnly: false },
+  { name: 'Relatórios', href: '/reports', icon: BarChart3, adminOnly: true },
+  { name: 'Configurações', href: '/settings', icon: Settings, adminOnly: true },
 ];
 
 function Sidebar({ open, setOpen }: SidebarProps) {
@@ -43,6 +43,13 @@ function Sidebar({ open, setOpen }: SidebarProps) {
   const pathname = usePathname();
 
   const isActive = (href: string) => pathname === href;
+
+  // Filtra navegação baseado no role do usuário
+  const isWaiter = isWaiterRole(user?.role);
+  const navigation = allNavigation.filter(item => {
+    if (isWaiter && item.adminOnly) return false;
+    return true;
+  });
 
   return (
     <>
@@ -73,8 +80,8 @@ function Sidebar({ open, setOpen }: SidebarProps) {
         </div>
 
         <nav className="mt-6 px-3">
-          {/* Navegação do Restaurante - Owner/Manager */}
-          {restauranteNavigation.map((item) => {
+          {/* Navegação filtrada por role */}
+          {navigation.map((item) => {
             const active = isActive(item.href) && !item.comingSoon;
             // Render "coming soon" items as non-clickable with a "Brevemente" badge
             if (item.comingSoon) {
